@@ -35,8 +35,8 @@ def read_file():
         elif line.startswith("\t"):
             action_sets[current_actionset].append([line.strip()])
         else:
-            action_sets[line] = [] # stores commands and required files
-            current_actionset = line
+            action_sets[line[:-1]] = [] # stores commands and required files
+            current_actionset = line[:-1]
 
 
 
