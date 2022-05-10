@@ -31,7 +31,6 @@ def read_file():
                 hosts.append(host)
         elif line.startswith("\t\trequires"):
             required_files = line.strip().split()[1:]
-            print(f"{required_files=}")
             action_sets[current_actionset][-1].append(required_files)
         elif line.startswith("\t"):
             action_sets[current_actionset].append([line.strip()])
@@ -44,4 +43,4 @@ def read_file():
 
 read_file()
 print(hosts)
-print("\n".join("{}\t{}".format(k, v) for k, v in action_sets.items()))
+print("\n".join("{}\n\t{}".format(k, v) for k, v in action_sets.items()))
