@@ -8,15 +8,24 @@ Resources:
  + [Getting Started Explanation](https://teaching.csse.uwa.edu.au/units/CITS3002/project2022/gettingstarted.php)
  + [Clarifications](https://teaching.csse.uwa.edu.au/units/CITS3002/project2022/clarifications.php)
 
-## TODO:
+## Executing
+
+```sh
+python3 rake-p/rake-p.py [filename]
+```
+
+```sh
+./rake-c/rake-c [filename]
+```
+
+## Todo
+
  + [ ] Python Client (rakeclient-p)
    + [ ] Rakefile processing
    + [ ] Figure our whats required for rakefile parsing, add here
-
  + [ ] Rakeserver (Python)
    + [ ] Multiprocessing
  + [ ] C Client (rakeclient-c)
-
  + [ ] Report (PDF, 3 A4 pages long) (ideally with diagrams and examples)
    + [ ] the protocol you have designed and developed for all communication between your client and server programs
    + [ ] a 'walk-through' of the execution sequence employed to compile and link an multi-file program
