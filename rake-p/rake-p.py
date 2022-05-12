@@ -1,4 +1,5 @@
 import sys
+import os
 
 hosts = []
 action_sets = {}
@@ -38,9 +39,25 @@ def read_file():
             action_sets[line[:-1]] = [] # stores commands and required files
             current_actionset = line[:-1]
 
+def run_remote_commands(command):
+    pass
 
-
+def run_local_command(command):
+    ''' Some actions will produce output.  Where will the output go? How are 
+    you going to obtain/capture/access and report their output? Actions may
+     also fail, and may report that failure in different ways to different 
+     'locations'. Ensure that you can detect an action that has failed, and 
+     consider how you are going to obtain/capture/access and report its 
+     failure. '''
+    os.system(command)
 
 read_file()
 print(hosts)
 print("\n".join("{}\n\t{}".format(k, v) for k, v in action_sets.items()))
+
+for name,actionset in action_sets.items():
+    for command_data in actionset:
+        if command.startswith("remote-"):
+            run_remote_commands(command_data[0])
+        else:
+            run_local_command(command_data[0])
