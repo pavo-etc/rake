@@ -19,7 +19,7 @@ int nhosts;
 typedef struct {
     char *command;
     int n_required_files;
-    char **required_files;
+    char *required_files;
 } COMMAND;
 
 typedef struct {
@@ -33,3 +33,4 @@ int nactionsets;
 
 
 extern ACTIONSET *create_empty_actionset();
+extern COMMAND *create_empty_command();
