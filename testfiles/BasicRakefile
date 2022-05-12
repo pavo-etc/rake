@@ -1,0 +1,5 @@
+PORT = 8080
+HOSTS = localhost
+
+actionset1:
+	echo Hello there!
