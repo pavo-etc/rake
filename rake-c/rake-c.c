@@ -39,6 +39,11 @@ void read_file(char *filename) {
         if (line[lastchr] == '\n') {
             line[lastchr] = '\0';
         }
+        
+        //filter out comments
+        if (startswith("#", line)) {
+            continue;
+        }
 
         printf("%d : %s\n", nwords, line);
         //printf("strlen(line): %ld\n",strlen(line));
