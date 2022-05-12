@@ -14,6 +14,7 @@ void read_file(char *filename) {
 
     printf("Reading from %s\n", filename);
     FILE *f = fopen(filename, "r");
+    //exit gracefully if file descriptor is equal to null
     if (f == NULL){
         fprintf(stderr, "Error opening the file %s\n", filename);
         exit(EXIT_FAILURE);
@@ -27,10 +28,13 @@ void read_file(char *filename) {
     int nwords;
 
     while ( (nread = getline(&line, &len, f) != -1) ) {
+
         char *commentstart;
+        //ignores the comments in the rakefile
         if ( (commentstart = strchr(line, '#')) != NULL ) {
             commentstart[0] = '\0';
         }
+        //replaces each new line character with the null byte
         size_t lastchr = strlen(line) - 1;
         if (line[lastchr] == '\n') {
             line[lastchr] = '\0';
@@ -50,6 +54,7 @@ void read_file(char *filename) {
         } else if (startswith("HOSTS", line)) {
             // Process hosts
             for (int i = 0; i < nwords-2; i++) {
+                //for debugging purposes, assuming to make sure your accessing correct indices 
                 printf("i: %d words[i]: %s\n", i,words[i]);
                 printf("words[i+2]: %s\n", words[i+2]);
                 
@@ -57,19 +62,21 @@ void read_file(char *filename) {
                 CHECK_ALLOC(given_host);
                 printf("given_host: %s\n", given_host);
                 if (strchr(given_host, ':') == NULL) {
-                    char *combined = calloc(1, sizeof(char) * (port_len + strlen(given_host) + 1));
+                    char *combined = calloc(1, sizeof(char) * (port_len + strlen(given_host) + 1)); //how did you come up with this???????????????????
                     strcpy(combined, given_host);
                     strcat(combined, ":");
                     strcat(combined, default_port);
                     printf("No port!\n");
-                    printf("Addeds port %s\n", combined);
+                    printf("Added port %s\n", combined);
                     // this is sus since combined could be smaller than previous.  should replace strlen(combined) with something that will always increase size
+                    //could you explain this please, if my understanding is right couldn't we simply do an if statement here to make sure it is not a decrease?
                     hosts = realloc(hosts, (nhosts+1) * sizeof(char) * strlen(combined)); 
                     hosts[nhosts] = strdup(combined);
                     nhosts++;
                 } else {
                     printf("Has port!\n");
                     // this is sus since given_host could be smaller than previous.  should replace strlen(given_host) with something that will always increase size
+                    //once again couldn't we do an if, but then i suppose we could be wasting space if we get somthing smaller
                     hosts = realloc(hosts, (nhosts+1) * sizeof(char) * strlen(given_host));
                     CHECK_ALLOC(hosts);
                     hosts[nhosts] = strdup(given_host);
