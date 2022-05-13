@@ -1,5 +1,6 @@
 import sys
 import os
+import subprocess
 
 hosts = []
 action_sets = {}
@@ -43,21 +44,31 @@ def run_remote_commands(command):
     pass
 
 def run_local_command(command):
-    ''' Some actions will produce output.  Where will the output go? How are 
-    you going to obtain/capture/access and report their output? Actions may
-     also fail, and may report that failure in different ways to different 
-     'locations'. Ensure that you can detect an action that has failed, and 
-     consider how you are going to obtain/capture/access and report its 
-     failure. '''
-    os.system(command)
+    ''' 
+    Runs the command and if successful returns that output and a 0 
+    to represent sucessful execution, if there's an error we catch 
+    the error and communicate what the error was. At the moment we 
+    also print for debug purposes.
+    '''
+    result = subprocess.Popen(command, shell = True,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+    output,err=result.communicate()
+    if output:
+        print(os.system(command))
+        return output
+    else:
+        print(err)
+        return err
+    
+   
 
 read_file()
 print(hosts)
 print("\n".join("{}\n\t{}".format(k, v) for k, v in action_sets.items()))
 
-for name,actionset in action_sets.items():
+for actionset in action_sets.items():
     for command_data in actionset:
-        if command.startswith("remote-"):
-            run_remote_commands(command_data[0])
-        else:
-            run_local_command(command_data[0])
+        print(command_data[0][0])
+        if command_data[0][0].startswith("a"): 
+            continue
+        print("-------" + command_data[0][0] + "-------------")
+        run_local_command(str(command_data[0][0]))
