@@ -2,4 +2,6 @@ PORT = 8080
 HOSTS = localhost
 
 actionset1:
+	notify-send A notification
 	echo Hello there!
+	echo Done
