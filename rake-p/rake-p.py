@@ -43,6 +43,19 @@ def read_file():
 def run_remote_commands(command):
     pass
 
+def send_remote_commands(command):
+    '''
+    Function checks to see if command leads with remote, if so
+    it takes a slice ignoring the word remote and stores it 
+    ready to send off.
+    '''
+    remote_command = ''
+    if command[0][0].startswith('remote'):
+        remote_command = command[7:]
+    else:
+        print("comman is not a remote command")
+    return remote_command
+
 def run_local_command(command):
     ''' 
     Runs the command and if successful returns that output and a 0 
