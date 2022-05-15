@@ -2,8 +2,11 @@ import sys
 import os
 import subprocess
 import socket
+import select
+import random
 
 hosts = []
+host_index = 0
 action_sets = {}
 '''
 Format of action_sets:
@@ -71,18 +74,19 @@ def send_remote_command(command_data):
     sends required files (if necessary), gets command feedback.
     '''
     s = socket.socket()
-    for host in hosts:
-        addr = host.split(":")[0]
-        port = int(host.split(":")[1])
+    #s.setblocking(0)
+    host = hosts[host_index] # TODO replace with function for finding host to use
+    #host_index = (host_index + 1) % len(hosts)
+    addr = host.split(":")[0]
+    port = int(host.split(":")[1])
 
-        s.connect((addr,port))
+    print(f"Attempting conection to {addr}:{port}")
+    s.connect((addr,port))
+    s.send(command_data[0].encode())
 
-        print("\tRecieved data:",s.recv(1024).decode())
-        s.send(command_data[0].encode())
-        print("\tRecieved data:",s.recv(1024).decode())
+    return s
 
-    s.close()
-
+# This potentially will be replaced by just executing these on localhost
 def run_local_command(command_data):
     ''' 
     Runs the command and if successful returns that output and a 0 
@@ -110,13 +114,16 @@ print(f"Hosts: {hosts}")
 for actionsetname, commandlist in action_sets.items():
     print(f"------------Starting {actionsetname}------------")
     processes = []
+    sockets = []
     stdouts = []
     stderrs = []
     exitcodes = []
     for command_data in commandlist:
         print(command_data[0])
         if command_data[0].startswith("remote-"):
-            send_remote_command(command_data)
+            sock = send_remote_command(command_data)
+            sockets.append(sock)
+            host_index = (host_index + 1) % len(hosts)
         else:
             proc = run_local_command(command_data)
             processes.append(proc)
@@ -127,6 +134,15 @@ for actionsetname, commandlist in action_sets.items():
         stderrs.append(str(proc.stderr.read().decode("utf-8")))
         exitcodes.append(proc.returncode)
     
+    while True:
+        rsocks, wsocks, esocks = select.select(sockets,[],[])
+        for sock in rsocks:
+            data, addr = sock.recvfrom(1024)
+            if data != b"":
+                print(f"From: {addr}\nRecieved: {data}")
+        if len(rsocks) == len(sockets):
+            break
+
     print(stdouts)
     print(stderrs)
     print(exitcodes)

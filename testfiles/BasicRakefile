@@ -1,5 +1,5 @@
 PORT = 40000
-HOSTS = localhost
+HOSTS = localhost localhost:40001
 
 actionset1:
 	notify-send A notification 
@@ -7,4 +7,3 @@ actionset1:
 	echo Done
 	remote-echo a remote command execution
 	remote-ls
-	remote-cat dempseys face
