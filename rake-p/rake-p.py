@@ -1,6 +1,7 @@
 import sys
 import os
 import subprocess
+import socket
 
 hosts = []
 action_sets = {}
@@ -56,12 +57,12 @@ def read_file():
 def check_if_file_exists(filename):
     return os.path.exists(filename)
 
-def missing_file(actionset, command_data, filename):
-    print(f"Error: missing file\n\tactionset: {actionset[0]}\n\tcommand: {command_data[0]}\n\tfilename: {filename}", file=sys.stderr)
+def missing_file(command_data, filename):
+    print(f"Error: missing file\n\tcommand: {command_data[0]}\n\tfilename: {filename}", file=sys.stderr)
     exit(1)
 
 def command_fail(actionset, command_data, exitcode):
-    print(f"Error: command failed\n\tactionset: {actionset[0]}\n\tcommand: {command_data[0]}\n\texitcode: {exitcode}")
+    print(f"Error: command failed\n\tactionset: {actionset}\n\tcommand: {command_data[0]}\n\texitcode: {exitcode}")
     exit(1)
 
 def send_remote_command(command_data):
@@ -69,7 +70,18 @@ def send_remote_command(command_data):
     Function that takes a remote command.  Choses a server to send it to,
     sends required files (if necessary), gets command feedback.
     '''
-    pass
+    s = socket.socket()
+    for host in hosts:
+        addr = host.split(":")[0]
+        port = int(host.split(":")[1])
+
+        s.connect((addr,port))
+
+        print("\tRecieved data:",s.recv(1024).decode())
+        s.send(command_data[0].encode())
+        print("\tRecieved data:",s.recv(1024).decode())
+
+    s.close()
 
 def run_local_command(command_data):
     ''' 
@@ -83,9 +95,8 @@ def run_local_command(command_data):
         for file in command_data[1]:
             does_file_exist = check_if_file_exists(file)
             if not does_file_exist:
-                return file
+                missing_file(command_data, file)
 
-    #result = subprocess.run(command_data[0], shell = True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     proc = subprocess.Popen(command_data[0], shell = True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     return proc
 
@@ -96,25 +107,22 @@ def run_local_command(command_data):
 read_file()
 print(f"Hosts: {hosts}")
 
-for actionset in action_sets.items():
-    print(f"------------Starting {actionset[0]}------------")
+for actionsetname, commandlist in action_sets.items():
+    print(f"------------Starting {actionsetname}------------")
     processes = []
     stdouts = []
     stderrs = []
     exitcodes = []
-    for command_data in actionset[1]:
+    for command_data in commandlist:
         print(command_data[0])
         if command_data[0].startswith("remote-"):
             send_remote_command(command_data)
         else:
             proc = run_local_command(command_data)
-            if type(proc) == str:
-                missing_file(actionset, command_data, filename=proc)
             processes.append(proc)
-            #if response == ""
+
     for proc in processes:
         proc.wait()
-        #print("exitcode:",p.returncode)
         stdouts.append(str(proc.stdout.read().decode("utf-8")))
         stderrs.append(str(proc.stderr.read().decode("utf-8")))
         exitcodes.append(proc.returncode)
@@ -124,7 +132,7 @@ for actionset in action_sets.items():
     print(exitcodes)
     for i,exitcode in enumerate(exitcodes):
         if exitcode != 0:
-            command_fail(actionset, actionset[1][i], exitcode)
+            command_fail(actionsetname, commandlist[i], exitcode)
 
 
                 
