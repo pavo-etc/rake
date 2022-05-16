@@ -4,13 +4,12 @@ import time
 import subprocess
 
 def run_command(command_data):
-    if len(command_data) == 2:
-        for file in command_data[1]:
-            does_file_exist = check_if_file_exists(file)
-            if not does_file_exist:
-                missing_file(command_data, file)
+    if command_data[0].startswith('remote-'):
+        command_string = command_data[0][7:]
+    else:
+        command_string = command_data[0]
 
-    proc = subprocess.Popen(command_data[0][7:], shell = True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    proc = subprocess.Popen(command_string, shell = True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     return proc
 
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -32,32 +31,56 @@ i = 0
 
 processes = []
 returned = []
+connections = []
+addresses = []
+txt_command = []
+
+#to ensure that a process isn't skipped
+s.settimeout(0.01)
 
 try:
     while True:
-        connection, addr = s.accept()
-        print("Got connection from", addr)
+        try:
+            connection, addr = s.accept()
+        except socket.timeout:
+            connection = None
 
-        #connection.send(f"Succesful connection ({i}) to {addr}:{port}".encode())
-        i+=1
 
-        received_data = connection.recv(1024).decode()
-        if received_data:
-            proc = run_command([received_data,])
-            processes.append(proc)
-            returned.append(False)
+        if connection is not None:
+            print(f"Got connection {i} from {addr}")
+            i+=1
 
-        print(f"\t{received_data=}")
+            received_data = connection.recv(1024).decode()
+            if received_data:
+                connections.append(connection)
+                txt_command.append(received_data)
+                addresses.append(addr)
+                proc = run_command([received_data,])
+                processes.append(proc)
+                returned.append(False)
 
-        '''for i, proc in enumerate(processes):
+            print(f"\t{received_data=}")
+        
+        for i, proc in enumerate(processes):
             if proc.poll() is not None and returned[i] == False:
-                connection.send(str(proc.returncode).encode())
-                print(f"Returning {str(proc.returncode)} to {addr})
-                returned[i] = True'''
+                msg =(txt_command[i] + '\t' + str(proc.returncode))
+                connections[i].send(msg.encode())
+                print(f"Sending to: {addresses[i]}\n\t{msg}")
+                connections[i].close()
+                returned[i] = True
 
-        connection.send(received_data.encode())
-        print("\tEchoing received_data back to client")
-        connection.close()
+
+        '''
+        for i, proc in enumerate(processes):
+            if proc.poll() is not None and returned[i] == False:
+                connection.send((received_data + '\t' + str(proc.returncode)).encode())
+                print(f"Returning {str(proc.returncode)} to {addr}")
+                returned[i] = True
+        '''
+
+        #connection.send(received_data.encode())
+        #print("\tEchoing received_data back to client")
+        #connection.close()
 except KeyboardInterrupt:
     s.close()
-    print("Closed server")
+    print("\tClosed server")

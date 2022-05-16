@@ -1,13 +1,16 @@
+from email.policy import default
 import sys
 import os
 import subprocess
 import socket
 import select
 import random
+import time
 
 hosts = []
 host_index = 0
 action_sets = {}
+
 '''
 Format of action_sets:
 "actionset1" : [
@@ -32,10 +35,10 @@ def read_file():
     with open(filename, "r") as f:
         rakefile_lines = f.readlines()
    
-    default_port = []
     in_actionset = False
     current_actionset = None
-    
+    global default_port 
+
     for line in rakefile_lines:
         line = line.rstrip()
         line = line.partition('#')[0] # Remove comments
@@ -68,17 +71,21 @@ def command_fail(actionset, command_data, exitcode):
     print(f"Error: command failed\n\tactionset: {actionset}\n\tcommand: {command_data[0]}\n\texitcode: {exitcode}")
     exit(1)
 
-def send_remote_command(command_data):
+def send_command(command_data, is_local=False):
     '''
     Function that takes a remote command.  Choses a server to send it to,
     sends required files (if necessary), gets command feedback.
     '''
     s = socket.socket()
-    #s.setblocking(0)
+  
     host = hosts[host_index] # TODO replace with function for finding host to use
-    #host_index = (host_index + 1) % len(hosts)
-    addr = host.split(":")[0]
-    port = int(host.split(":")[1])
+    if is_local:
+        addr = "localhost"
+        #print(default_port)
+        port = int(default_port)
+    else:
+        addr = host.split(":")[0]
+        port = int(host.split(":")[1])
 
     print(f"Attempting conection to {addr}:{port}")
     s.connect((addr,port))
@@ -86,34 +93,12 @@ def send_remote_command(command_data):
 
     return s
 
-# This potentially will be replaced by just executing these on localhost
-def run_local_command(command_data):
-    ''' 
-    Runs the command and if successful returns that output and a 0 
-    to represent sucessful execution, if there's an error we catch 
-    the error and communicate what the error was. At the moment we 
-    also print for debug purposes.
-    '''
-    # if it has required files
-    if len(command_data) == 2:
-        for file in command_data[1]:
-            does_file_exist = check_if_file_exists(file)
-            if not does_file_exist:
-                missing_file(command_data, file)
-
-    proc = subprocess.Popen(command_data[0], shell = True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    return proc
-
-
-    
-   
 
 read_file()
 print(f"Hosts: {hosts}")
 
 for actionsetname, commandlist in action_sets.items():
     print(f"------------Starting {actionsetname}------------")
-    processes = []
     sockets = []
     stdouts = []
     stderrs = []
@@ -121,25 +106,21 @@ for actionsetname, commandlist in action_sets.items():
     for command_data in commandlist:
         print(command_data[0])
         if command_data[0].startswith("remote-"):
-            sock = send_remote_command(command_data)
-            sockets.append(sock)
+            sock = send_command(command_data)
             host_index = (host_index + 1) % len(hosts)
         else:
-            proc = run_local_command(command_data)
-            processes.append(proc)
+            sock = send_command(command_data, is_local=True)
 
-    for proc in processes:
-        proc.wait()
-        stdouts.append(str(proc.stdout.read().decode("utf-8")))
-        stderrs.append(str(proc.stderr.read().decode("utf-8")))
-        exitcodes.append(proc.returncode)
+        sockets.append(sock)
+    
     
     while True:
         rsocks, wsocks, esocks = select.select(sockets,[],[])
+    
         for sock in rsocks:
             data, addr = sock.recvfrom(1024)
             if data != b"":
-                print(f"From: {addr}\nRecieved: {data}")
+                print(f"Recieved: {data.decode('utf-8')}")
         if len(rsocks) == len(sockets):
             break
 
