@@ -71,25 +71,49 @@ def command_fail(actionset, command_data, exitcode):
     print(f"Error: command failed\n\tactionset: {actionset}\n\tcommand: {command_data[0]}\n\texitcode: {exitcode}")
     exit(1)
 
-def send_command(command_data, is_local=False):
+def find_host():
+    mincost = 1000
+    mincost_index = None
+    for i, host in enumerate(hosts):
+        s = socket.socket()
+        addr = host.split(":")[0]
+        port = int(host.split(":")[1])
+        print(f"\t\tQuerying cost from host {i} {host}")
+        s.connect((addr,port))
+        s.send("cost-query".encode())
+        data, addr = s.recvfrom(1024)
+        decoded_data = data.decode("utf-8")
+        if decoded_data.startswith("cost "):
+            cost = int(decoded_data.split()[1])
+            print(f"\t\t\tReceived: {decoded_data}")
+            if cost < mincost:
+                mincost_index = i
+                mincost = cost
+    
+    print(f"\t\tSelecting host {mincost_index}")
+    return mincost_index
+
+
+
+def send_command(command_data, i, is_local=False):
     '''
     Function that takes a remote command.  Choses a server to send it to,
     sends required files (if necessary), gets command feedback.
     '''
-    s = socket.socket()
-  
-    host = hosts[host_index] # TODO replace with function for finding host to use
     if is_local:
         addr = "localhost"
-        #print(default_port)
         port = int(default_port)
     else:
+        host = hosts[find_host()] # TODO replace with function for finding host to use
         addr = host.split(":")[0]
         port = int(host.split(":")[1])
 
-    print(f"Attempting conection to {addr}:{port}")
+    s = socket.socket()
+    print(f"\tAttempting conection to {addr}:{port}")
     s.connect((addr,port))
-    s.send(command_data[0].encode())
+    msg = (str(i) + " " + command_data[0])
+    print(f"\tSending: {msg}")
+    s.send(msg.encode())
 
     return s
 
@@ -102,14 +126,14 @@ for actionsetname, commandlist in action_sets.items():
     sockets = []
     stdouts = []
     stderrs = []
-    exitcodes = []
-    for command_data in commandlist:
+    exitcodes = [None] * len(commandlist)
+    for i, command_data in enumerate(commandlist):
         print(command_data[0])
         if command_data[0].startswith("remote-"):
-            sock = send_command(command_data)
-            host_index = (host_index + 1) % len(hosts)
+            sock = send_command(command_data, i)
+            host_index += 1
         else:
-            sock = send_command(command_data, is_local=True)
+            sock = send_command(command_data, i, is_local=True)
 
         sockets.append(sock)
     
@@ -120,16 +144,23 @@ for actionsetname, commandlist in action_sets.items():
         for sock in rsocks:
             data, addr = sock.recvfrom(1024)
             if data != b"":
-                print(f"Recieved: {data.decode('utf-8')}")
+                decoded_data = data.decode('utf-8')
+                print(f"Recieved: {decoded_data}")
+                command_index = int(decoded_data.split()[0])
+                exitcode = int(decoded_data.split()[1])
+                exitcodes[command_index] = exitcode
+
+
         if len(rsocks) == len(sockets):
             break
 
-    print(stdouts)
-    print(stderrs)
-    print(exitcodes)
+    print(f"{stdouts=}")
+    print(f"{stderrs=}")
+    print(f"{exitcodes=}")
     for i,exitcode in enumerate(exitcodes):
         if exitcode != 0:
             command_fail(actionsetname, commandlist[i], exitcode)
 
+print("Complete Rake successfully!")
 
                 

@@ -3,3 +3,4 @@
 .vscode/
 *.o
 rake-c/rake-c
+*.txt
