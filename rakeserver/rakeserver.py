@@ -1,7 +1,13 @@
 import socket
+import struct
 import sys
 import time
 import subprocess
+
+def send_msg(sock, msg):
+    print(f"Sending to {sock.getpeername()}: {msg}")
+    msg = struct.pack('>I', len(msg)) + msg.encode()
+    sock.send(msg)
 
 def run_command(command_data):
     if command_data[0].startswith('remote-'):
@@ -83,9 +89,17 @@ try:
         for i, proc in enumerate(processes):
             if proc.poll() is not None and returned[i] == False:
                 n_active_procs-=1
-                msg = f"{command_indexes[i]} {proc.returncode}"
-                connections[i].send(msg.encode())
-                print(f"Sending to: {addresses[i]}\n\t{msg}")
+
+                msg1 = f"{command_indexes[i]} {proc.returncode}"
+                msg2 = str(proc.stdout.read().decode("utf-8")) 
+                msg3 = str(proc.stderr.read().decode("utf-8"))
+                
+            
+                send_msg(connections[i], msg1)
+                send_msg(connections[i], msg2)
+                send_msg(connections[i], msg3)
+
+        
                 connections[i].close()
                 returned[i] = True
 

@@ -1,4 +1,5 @@
 from email.policy import default
+import struct
 import sys
 import os
 import subprocess
@@ -66,9 +67,18 @@ def missing_file(command_data, filename):
     print(f"Error: missing file\n\tcommand: {command_data[0]}\n\tfilename: {filename}", file=sys.stderr)
     exit(1)
 
-def command_fail(actionset, command_data, exitcode):
-    print(f"Error: command failed\n\tactionset: {actionset}\n\tcommand: {command_data[0]}\n\texitcode: {exitcode}")
+def command_fail(actionset, command_data, exitcode, stderr):
+    print(f"Error: command failed\n\tactionset: {actionset}\n\tcommand: {command_data[0]}\n\texitcode: {exitcode}\n\tstderr: {stderr}")
     exit(1)
+
+def recv_msg(sock):
+    # Read message length and unpack it into an integer
+    raw_msglen, addr = sock.recvfrom(4)
+    if not raw_msglen:
+        return None, None
+    msglen = struct.unpack('>I', raw_msglen)[0]
+    # Read the message data
+    return sock.recvfrom(msglen)
 
 def find_host():
     mincost = 1000
@@ -91,8 +101,6 @@ def find_host():
     
     print(f"\t\tSelecting host {mincost_index}")
     return mincost_index
-
-
 
 def send_command(command_data, i, is_local=False):
     '''
@@ -123,8 +131,8 @@ print(f"Hosts: {hosts}")
 for actionsetname, commandlist in action_sets.items():
     print(f"------------Starting {actionsetname}------------")
     sockets = []
-    stdouts = []
-    stderrs = []
+    stdouts = [None] * len(commandlist)
+    stderrs = [None] * len(commandlist)
     exitcodes = [None] * len(commandlist)
     for i, command_data in enumerate(commandlist):
         print(command_data[0])
@@ -135,19 +143,24 @@ for actionsetname, commandlist in action_sets.items():
 
         sockets.append(sock)
     
-    
     while True:
         rsocks, wsocks, esocks = select.select(sockets,[],[])
     
         for sock in rsocks:
-            data, addr = sock.recvfrom(1024)
-            if data != b"":
-                decoded_data = data.decode('utf-8')
-                print(f"Recieved: {decoded_data}")
-                command_index = int(decoded_data.split()[0])
-                exitcode = int(decoded_data.split()[1])
-                exitcodes[command_index] = exitcode
+            data1, addr1 = recv_msg(sock)
+            if data1 is None:
+                continue
+            print(f"{data1=}")
+            data2, addr2 = recv_msg(sock)
+            print(f"{data2=}")
 
+            data3, addr3= recv_msg(sock)
+            print(f"{data3=}")
+            
+            command_index = int(data1.split()[0])
+            exitcodes[command_index] = int(data1.split()[1])
+            stdouts[command_index] = data2.decode()
+            stderrs[command_index] = data3.decode()
 
         if len(rsocks) == len(sockets):
             break
@@ -157,8 +170,8 @@ for actionsetname, commandlist in action_sets.items():
     print(f"{exitcodes=}")
     for i,exitcode in enumerate(exitcodes):
         if exitcode != 0:
-            command_fail(actionsetname, commandlist[i], exitcode)
+            command_fail(actionsetname, commandlist[i], exitcode, stderrs[i])
 
-print("Complete Rake successfully!")
+print("Completed Rake successfully!")
 
                 
