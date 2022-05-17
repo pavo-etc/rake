@@ -8,7 +8,6 @@ import random
 import time
 
 hosts = []
-host_index = 0
 action_sets = {}
 
 '''
@@ -104,7 +103,7 @@ def send_command(command_data, i, is_local=False):
         addr = "localhost"
         port = int(default_port)
     else:
-        host = hosts[find_host()] # TODO replace with function for finding host to use
+        host = hosts[find_host()] 
         addr = host.split(":")[0]
         port = int(host.split(":")[1])
 
@@ -131,7 +130,6 @@ for actionsetname, commandlist in action_sets.items():
         print(command_data[0])
         if command_data[0].startswith("remote-"):
             sock = send_command(command_data, i)
-            host_index += 1
         else:
             sock = send_command(command_data, i, is_local=True)
 
