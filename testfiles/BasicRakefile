@@ -6,7 +6,9 @@ actionset1:
 	echo poop
 	sleep 3
 	remote-sleep 4
+		requires zach.txt dempsey.c chris.rs
 	remote-echo a remote command execution
+#	remote-echode a remote command execution
 	remote-ls
 	remote-sleep 4
 	remote-echo D1 > D1.txt
