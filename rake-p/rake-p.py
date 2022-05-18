@@ -71,14 +71,17 @@ def command_fail(actionset, command_data, exitcode, stderr):
     print(f"Error: command failed\n\tactionset: {actionset}\n\tcommand: {command_data[0]}\n\texitcode: {exitcode}\n\tstderr: {stderr}")
     exit(1)
 
+def send_msg(sock, msg):
+    print(f"Sending to {sock.getpeername()}: {msg}")
+    msg = struct.pack('>I', len(msg)) + msg.encode()
+    sock.send(msg)
+
 def recv_msg(sock):
-    # Read message length and unpack it into an integer
-    raw_msglen, addr = sock.recvfrom(4)
-    if not raw_msglen:
-        return None, None
-    msglen = struct.unpack('>I', raw_msglen)[0]
-    # Read the message data
-    return sock.recvfrom(msglen)
+    packed_msg_len= sock.recv(4)
+    if not packed_msg_len:
+        return None
+    msg_len = struct.unpack('>I', packed_msg_len)[0]
+    return sock.recv(msg_len)
 
 def find_host():
     mincost = 1000
@@ -89,8 +92,8 @@ def find_host():
         port = int(host.split(":")[1])
         print(f"\t\tQuerying cost from host {i} {host}")
         s.connect((addr,port))
-        s.send("cost-query".encode())
-        data, addr = s.recvfrom(1024)
+        send_msg(s, 'cost-query')
+        data = recv_msg(s)
         decoded_data = data.decode("utf-8")
         if decoded_data.startswith("cost "):
             cost = int(decoded_data.split()[1])
@@ -102,7 +105,7 @@ def find_host():
     print(f"\t\tSelecting host {mincost_index}")
     return mincost_index
 
-def send_command(command_data, i, is_local=False):
+def send_command(command_data, i, n_required_files, is_local=False):
     '''
     Function that takes a remote command.  Choses a server to send it to,
     sends required files (if necessary), gets command feedback.
@@ -118,9 +121,14 @@ def send_command(command_data, i, is_local=False):
     s = socket.socket()
     print(f"\tAttempting conection to {addr}:{port}")
     s.connect((addr,port))
-    msg = (str(i) + " " + command_data[0])
+    msg = f'{i} {n_required_files} {command_data[0]}'
     print(f"\tSending: {msg}")
-    s.send(msg.encode())
+    send_msg(s, msg)
+
+    for j in range(n_required_files):
+        print(f'Sending filename: { command_data[1][j]=}')
+        send_msg(s, command_data[1][j])
+
 
     return s
 
@@ -136,10 +144,15 @@ for actionsetname, commandlist in action_sets.items():
     exitcodes = [None] * len(commandlist)
     for i, command_data in enumerate(commandlist):
         print(command_data[0])
-        if command_data[0].startswith("remote-"):
-            sock = send_command(command_data, i)
+        if len(command_data) > 1:
+            n_required_files = len(command_data[1])
         else:
-            sock = send_command(command_data, i, is_local=True)
+            n_required_files = 0
+            
+        if command_data[0].startswith("remote-"):
+            sock = send_command(command_data, i, n_required_files)
+        else:
+            sock = send_command(command_data, i, n_required_files, is_local=True)
 
         sockets.append(sock)
     
@@ -147,14 +160,14 @@ for actionsetname, commandlist in action_sets.items():
         rsocks, wsocks, esocks = select.select(sockets,[],[])
     
         for sock in rsocks:
-            data1, addr1 = recv_msg(sock)
+            data1 = recv_msg(sock)
             if data1 is None:
                 continue
             print(f"{data1=}")
-            data2, addr2 = recv_msg(sock)
+            data2 = recv_msg(sock)
             print(f"{data2=}")
 
-            data3, addr3= recv_msg(sock)
+            data3 = recv_msg(sock)
             print(f"{data3=}")
             
             command_index = int(data1.split()[0])
@@ -168,6 +181,8 @@ for actionsetname, commandlist in action_sets.items():
     print(f"{stdouts=}")
     print(f"{stderrs=}")
     print(f"{exitcodes=}")
+    print("\n\n")
+
     for i,exitcode in enumerate(exitcodes):
         if exitcode != 0:
             command_fail(actionsetname, commandlist[i], exitcode, stderrs[i])

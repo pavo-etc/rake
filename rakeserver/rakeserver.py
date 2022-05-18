@@ -9,6 +9,14 @@ def send_msg(sock, msg):
     msg = struct.pack('>I', len(msg)) + msg.encode()
     sock.send(msg)
 
+def recv_msg(sock):
+    print(f"Starting msg receive")
+    packed_msg_len = sock.recv(4)
+    if not packed_msg_len:
+        return None
+    msg_len = struct.unpack('>I', packed_msg_len)[0]
+    return sock.recv(msg_len)
+
 def run_command(command_data):
     if command_data[0].startswith('remote-'):
         command_string = command_data[0][7:]
@@ -60,19 +68,22 @@ try:
         if connection is not None:
             print(f"Got connection {i} from {addr}")
             i+=1
-
-            received_data = connection.recv(1024).decode()
+           
+            received_data = recv_msg(connection).decode()
             print(f"\t{received_data=}")
             
             if received_data == "cost-query":
                 msg = "cost " + str(n_active_procs)
                 print(f"Received cost-query from: {addr}.  Replying: {msg}")
-                connection.send(msg.encode())
+                send_msg(connection, msg)
+                
             
             elif received_data:
-                index = received_data[:received_data.find(" ")]
+                index = received_data.split()[0]
                 command_indexes.append(index)
-                command_str = received_data[received_data.find(" ")+1:]
+                n_required_files = int(received_data.split()[1])
+                print(f'{n_required_files=}')
+                command_str = " ".join(received_data.split()[2:])
                 command_strs.append(command_str)
 
                 connections.append(connection)
@@ -80,6 +91,12 @@ try:
                 returned.append(False)
                 
                 print(f"\tRunning command {index}: {command_str}")
+                filenames = []
+                for i in range(n_required_files):
+                    filename = recv_msg(connection)
+                    filenames.append(filename.decode())
+                print(f'{filenames=}')
+
 
                 proc = run_command([command_str,])
                 processes.append(proc)
