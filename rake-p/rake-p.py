@@ -73,8 +73,11 @@ def command_fail(actionset, command_data, exitcode, stderr):
 
 def send_msg(sock, msg):
     print(f"Sending to {sock.getpeername()}: {msg}")
-    msg = struct.pack('>I', len(msg)) + msg.encode()
-    sock.send(msg)
+    if type(msg) == bytes:
+        packed_msg = struct.pack('>I', len(msg)) + msg
+    else:
+        packed_msg = struct.pack('>I', len(msg)) + msg.encode()
+    sock.send(packed_msg)
 
 def recv_msg(sock):
     packed_msg_len= sock.recv(4)
@@ -128,6 +131,10 @@ def send_command(command_data, i, n_required_files, is_local=False):
     for j in range(n_required_files):
         print(f'Sending filename: { command_data[1][j]=}')
         send_msg(s, command_data[1][j])
+        print(f'Sending file: { command_data[1][j]=}')
+        with open(command_data[1][j], "rb") as f:
+            send_msg(s, f.read())
+        
 
 
     return s

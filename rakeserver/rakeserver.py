@@ -6,8 +6,11 @@ import subprocess
 
 def send_msg(sock, msg):
     print(f"Sending to {sock.getpeername()}: {msg}")
-    msg = struct.pack('>I', len(msg)) + msg.encode()
-    sock.send(msg)
+    if type(msg) == bytes:
+        packed_msg = struct.pack('>I', len(msg)) + msg
+    else:
+        packed_msg = struct.pack('>I', len(msg)) + msg.encode()
+    sock.send(packed_msg)
 
 def recv_msg(sock):
     print(f"Starting msg receive")
@@ -95,6 +98,10 @@ try:
                 for i in range(n_required_files):
                     filename = recv_msg(connection)
                     filenames.append(filename.decode())
+                    file = recv_msg(connection)
+                    with open(filename, "wb") as f:
+                        f.write(file)
+                    print("Received file", file)
                 print(f'{filenames=}')
 
 
