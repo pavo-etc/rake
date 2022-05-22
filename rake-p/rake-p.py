@@ -47,8 +47,11 @@ def read_file(filename):
 
     if verbose: print(f"Reading from {filename}") 
 
-    with open(filename, "r") as f:
-        rakefile_lines = f.readlines()
+    try:
+        with open(filename, "r") as f:
+            rakefile_lines = f.readlines()
+    except:
+        print("Error Opening File")
    
     in_actionset = False
     current_actionset = None
@@ -209,11 +212,14 @@ def execute_actionsets():
                     filename = recv_msg(sock).decode()
                     file = recv_msg(sock)
                     if verbose: print("\t<-- filename:", filename)
-                    with open(filename, "wb") as f:
-                        f.write(file)
-                        if verbose: 
-                            print(f"\t<-- file (size {len(file)})")
-                            print(f"\tSaved file {filename=}")
+                    try:
+                        with open(filename, "wb") as f:
+                            f.write(file)
+                            if verbose: 
+                                print(f"\t<-- file (size {len(file)})")
+                                print(f"\tSaved file {filename=}")
+                    except:
+                        print("Error Opening File")
                 
 
 
@@ -224,6 +230,7 @@ def execute_actionsets():
 
             if len(rsocks) == len(sockets):
                 break
+            
         if verbose:
             print(f"\n{actionsetname} execution results:")
             print(f"{stdouts=}")
