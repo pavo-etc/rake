@@ -7,7 +7,9 @@ import socket
 import select
 import random
 import time
+import getopt
 
+verbose = False
 hosts = []
 action_sets = {}
 
@@ -25,13 +27,26 @@ Format of action_sets:
 ]
 '''
 
+def usage():
+    print(f'''\
+Usage: {sys.argv[0]} [-v] [Rakefile]
+    -v: Verbose output
+    file: file to execute instead of "./Rakefile"''',
+        file=sys.stderr)
+    exit(1)
 
-def read_file():
-    filename = "./Rakefile"
-    if len(sys.argv) > 1:
-        filename = sys.argv[1]
+def missing_file(command_data, filename):
+    print(f"Error: missing file\n\tcommand: {command_data[0]}\n\tfilename: {filename}", file=sys.stderr)
+    exit(1)
 
-    print(f"Reading from {filename}") 
+def command_fail(actionset, command_data, exitcode, stderr):
+    print(f"Error: command failed\n\tactionset: {actionset}\n\tcommand: {command_data[0]}\n\texitcode: {exitcode}\n\tstderr: {stderr}")
+    exit(1)
+
+def read_file(filename):
+
+    if verbose: print(f"Reading from {filename}") 
+
     with open(filename, "r") as f:
         rakefile_lines = f.readlines()
    
@@ -63,16 +78,8 @@ def read_file():
 def check_if_file_exists(filename):
     return os.path.exists(filename)
 
-def missing_file(command_data, filename):
-    print(f"Error: missing file\n\tcommand: {command_data[0]}\n\tfilename: {filename}", file=sys.stderr)
-    exit(1)
-
-def command_fail(actionset, command_data, exitcode, stderr):
-    print(f"Error: command failed\n\tactionset: {actionset}\n\tcommand: {command_data[0]}\n\texitcode: {exitcode}\n\tstderr: {stderr}")
-    exit(1)
-
 def send_msg(sock, msg):
-    print(f"Sending to {sock.getpeername()}: {msg}")
+    #if verbose: print(f"Sending to {sock.getpeername()}: {msg}")
     if type(msg) == bytes:
         packed_msg = struct.pack('>I', len(msg)) + msg
     else:
@@ -93,19 +100,24 @@ def find_host():
         s = socket.socket()
         addr = host.split(":")[0]
         port = int(host.split(":")[1])
-        print(f"\t\tQuerying cost from host {i} {host}")
+        
+        if verbose: print(f"\t\tQuerying cost from host {i} {host}")
+        
         s.connect((addr,port))
         send_msg(s, 'cost-query')
         data = recv_msg(s)
         decoded_data = data.decode("utf-8")
         if decoded_data.startswith("cost "):
             cost = int(decoded_data.split()[1])
-            print(f"\t\t\tReceived: {decoded_data}")
+            
+            if verbose: print(f"\t\t\tReceived: {decoded_data}")
+            
             if cost < mincost:
                 mincost_index = i
                 mincost = cost
     
-    print(f"\t\tSelecting host {mincost_index}")
+    if verbose: print(f"\t\tSelecting host {mincost_index}")
+    
     return mincost_index
 
 def send_command(command_data, i, n_required_files, is_local=False):
@@ -122,78 +134,111 @@ def send_command(command_data, i, n_required_files, is_local=False):
         port = int(host.split(":")[1])
 
     s = socket.socket()
-    print(f"\tAttempting conection to {addr}:{port}")
+    if verbose: print(f"\tAttempting conection to {addr}:{port}")
     s.connect((addr,port))
+    
     msg = f'{i} {n_required_files} {command_data[0]}'
-    print(f"\tSending: {msg}")
+    if verbose: print(f"\tSending: {msg}")
     send_msg(s, msg)
 
     for j in range(n_required_files):
-        print(f'Sending filename: { command_data[1][j]=}')
+        if verbose: print(f'Sending filename: { command_data[1][j]=}')
+        
         send_msg(s, command_data[1][j])
-        print(f'Sending file: { command_data[1][j]=}')
+        
+        #if verbose: print(f'Sending file: { command_data[1][j]=}')
+        
         with open(command_data[1][j], "rb") as f:
             send_msg(s, f.read())
         
-
-
     return s
 
 
-read_file()
-print(f"Hosts: {hosts}")
-
-for actionsetname, commandlist in action_sets.items():
-    print(f"------------Starting {actionsetname}------------")
-    sockets = []
-    stdouts = [None] * len(commandlist)
-    stderrs = [None] * len(commandlist)
-    exitcodes = [None] * len(commandlist)
-    for i, command_data in enumerate(commandlist):
-        print(command_data[0])
-        if len(command_data) > 1:
-            n_required_files = len(command_data[1])
-        else:
-            n_required_files = 0
-            
-        if command_data[0].startswith("remote-"):
-            sock = send_command(command_data, i, n_required_files)
-        else:
-            sock = send_command(command_data, i, n_required_files, is_local=True)
-
-        sockets.append(sock)
-    
-    while True:
-        rsocks, wsocks, esocks = select.select(sockets,[],[])
-    
-        for sock in rsocks:
-            data1 = recv_msg(sock)
-            if data1 is None:
-                continue
-            print(f"{data1=}")
-            data2 = recv_msg(sock)
-            print(f"{data2=}")
-
-            data3 = recv_msg(sock)
-            print(f"{data3=}")
-            
-            command_index = int(data1.split()[0])
-            exitcodes[command_index] = int(data1.split()[1])
-            stdouts[command_index] = data2.decode()
-            stderrs[command_index] = data3.decode()
-
-        if len(rsocks) == len(sockets):
-            break
-
-    print(f"{stdouts=}")
-    print(f"{stderrs=}")
-    print(f"{exitcodes=}")
-    print("\n\n")
-
-    for i,exitcode in enumerate(exitcodes):
-        if exitcode != 0:
-            command_fail(actionsetname, commandlist[i], exitcode, stderrs[i])
-
-print("Completed Rake successfully!")
-
+def execute_actionsets():
+    for actionsetname, commandlist in action_sets.items():
+        if verbose: print(f"------------Starting {actionsetname}------------")
+        sockets = []
+        stdouts = [None] * len(commandlist)
+        stderrs = [None] * len(commandlist)
+        exitcodes = [None] * len(commandlist)
+        for i, command_data in enumerate(commandlist):
+            if verbose: print(command_data[0])
+            if len(command_data) > 1:
+                n_required_files = len(command_data[1])
+            else:
+                n_required_files = 0
                 
+            if command_data[0].startswith("remote-"):
+                sock = send_command(command_data, i, n_required_files)
+            else:
+                sock = send_command(command_data, i, n_required_files, is_local=True)
+
+            sockets.append(sock)
+        
+        while True:
+            rsocks, wsocks, esocks = select.select(sockets,[],[])
+        
+            for sock in rsocks:
+                # Receives cmd index and exitcode
+                cmdindex_exitcode_nfile = recv_msg(sock)
+                if cmdindex_exitcode_nfile is None:
+                    continue
+                cmd_index = cmdindex_exitcode_nfile.split()[0]
+                exitcode = cmdindex_exitcode_nfile.split()[1]
+                n_return_files = cmdindex_exitcode_nfile.split()[2]
+                stdout = recv_msg(sock)
+
+                stderr = recv_msg(sock)
+
+                if int(n_return_files):
+                    filename = recv_msg(sock)
+                    file = recv_msg(sock)
+                    print("\t<--file:", filename)
+                    with open(filename, "wb") as f:
+                        f.write(file)
+                        print("Saved file!")
+
+                if verbose:
+                    print(f"{cmd_index=}")
+                    print(f"\t{exitcode=}")
+                    print(f"\t{stdout=}")
+                    print(f"\t{stderr=}")
+                
+
+
+                command_index = int(cmd_index)
+                exitcodes[command_index] = int(exitcode)
+                stdouts[command_index] = stdout.decode()
+                stderrs[command_index] = stderr.decode()
+
+            if len(rsocks) == len(sockets):
+                break
+        if verbose:
+            print(f"{stdouts=}")
+            print(f"{stderrs=}")
+            print(f"{exitcodes=}")
+            print("\n\n")
+
+        for i,exitcode in enumerate(exitcodes):
+            if exitcode != 0:
+                command_fail(actionsetname, commandlist[i], exitcode, stderrs[i])
+
+    if verbose: print("Executed Rakefile successfully!")
+
+if __name__ == "__main__":
+    optlist, args = getopt.getopt(sys.argv[1:], "v")
+    for opt in optlist:
+        print(opt)
+        if opt[0] == "-v":
+            verbose = True
+
+    if len(args) < 1:
+        usage()
+
+    read_file(args[0])
+    if verbose:
+        print("Hosts: ", hosts)
+
+    execute_actionsets()
+
+    

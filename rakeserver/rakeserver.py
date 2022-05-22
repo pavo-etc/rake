@@ -3,9 +3,10 @@ import struct
 import sys
 import time
 import subprocess
+import os
+import uuid
 
 def send_msg(sock, msg):
-    print(f"Sending to {sock.getpeername()}: {msg}")
     if type(msg) == bytes:
         packed_msg = struct.pack('>I', len(msg)) + msg
     else:
@@ -13,20 +14,18 @@ def send_msg(sock, msg):
     sock.send(packed_msg)
 
 def recv_msg(sock):
-    print(f"Starting msg receive")
     packed_msg_len = sock.recv(4)
     if not packed_msg_len:
         return None
     msg_len = struct.unpack('>I', packed_msg_len)[0]
     return sock.recv(msg_len)
 
-def run_command(command_data):
-    if command_data[0].startswith('remote-'):
-        command_string = command_data[0][7:]
-    else:
-        command_string = command_data[0]
+def run_command(cmd_str, execution_path):
+    if cmd_str.startswith('remote-'):
+        cmd_str = cmd_str[7:]
 
-    proc = subprocess.Popen(command_string, shell = True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    print("\texecuting", cmd_str)
+    proc = subprocess.Popen(cmd_str, cwd=execution_path, shell = True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     global n_active_procs
     n_active_procs+=1
     return proc
@@ -46,16 +45,19 @@ print(f"Socket binded to {port}")
 
 s.listen(5)
 print("Socket is listening")
-i = 0
 
+nconnections = 0
 n_active_procs = 0
 
 processes = []
+paths = []
+last_mod_times = []
+
 returned = []
 connections = []
 addresses = []
-command_strs = []
-command_indexes = []
+cmd_strs = []
+cmd_indexes = []
 
 #to ensure that a process isn't skipped
 s.settimeout(0.01)
@@ -69,61 +71,98 @@ try:
 
 
         if connection is not None:
-            print(f"Got connection {i} from {addr}")
-            i+=1
+            print(f"Got connection {nconnections} from {addr}")
+            nconnections += 1
            
             received_data = recv_msg(connection).decode()
-            print(f"\t{received_data=}")
-            
+            print("\t<--",received_data)
             if received_data == "cost-query":
                 msg = "cost " + str(n_active_procs)
-                print(f"Received cost-query from: {addr}.  Replying: {msg}")
+                print("\t-->",msg)
                 send_msg(connection, msg)
                 
             
             elif received_data:
                 index = received_data.split()[0]
-                command_indexes.append(index)
+                cmd_indexes.append(index)
                 n_required_files = int(received_data.split()[1])
-                print(f'{n_required_files=}')
-                command_str = " ".join(received_data.split()[2:])
-                command_strs.append(command_str)
+
+                cmd_str = " ".join(received_data.split()[2:])
+                cmd_strs.append(cmd_str)
 
                 connections.append(connection)
                 addresses.append(addr)
                 returned.append(False)
                 
-                print(f"\tRunning command {index}: {command_str}")
+                execution_path = f"/tmp/rs-{uuid.uuid4()}"
+                paths.append(execution_path)
+                try:
+                    os.mkdir(execution_path)
+                except FileExistsError:
+                    pass
+                
                 filenames = []
                 for i in range(n_required_files):
-                    filename = recv_msg(connection)
-                    filenames.append(filename.decode())
+                    filename = recv_msg(connection).decode()
+                    print("\t<--filename:", filename)
+                    filenames.append(filename)
                     file = recv_msg(connection)
-                    with open(filename, "wb") as f:
+                    #print("\t<--file:", file)
+                    filepath = os.path.join(execution_path, filename)
+                    with open(filepath, "wb") as f:
                         f.write(file)
-                    print("Received file", file)
-                print(f'{filenames=}')
+                
+                if len(filenames) > 0:
+                    last_mod_time = os.path.getmtime(os.path.join(execution_path, filenames[-1]))
+                else:
+                    last_mod_time = 0
+                last_mod_times.append(last_mod_time)
+                print(f"\tSaved {len(filenames)} files to dir: {execution_path}")
 
-
-                proc = run_command([command_str,])
+                proc = run_command(cmd_str, execution_path)
                 processes.append(proc)
                 
 
         
         for i, proc in enumerate(processes):
             if proc.poll() is not None and returned[i] == False:
+                print(f"Command {i} complete.  Sending to {connections[i].getpeername()}")
                 n_active_procs-=1
+                
+                output_file = None
+                max_time = 0
+                max_time_file = None
+                for dirname,subdirs,files in os.walk(paths[i]):
+                    for file in files:
+                        path = os.path.join(dirname, file)
+                        mod_time = os.stat(path).st_mtime
+                        if mod_time > max_time:
+                            max_time = mod_time
+                            max_time_file = path
 
-                msg1 = f"{command_indexes[i]} {proc.returncode}"
+                if max_time > last_mod_times[i]:
+                    output_file = max_time_file
+                    msg1 = f"{cmd_indexes[i]} {proc.returncode} 1"
+                else:
+                    msg1 = f"{cmd_indexes[i]} {proc.returncode} 0"
+
                 msg2 = str(proc.stdout.read().decode("utf-8")) 
                 msg3 = str(proc.stderr.read().decode("utf-8"))
                 
-            
+                
                 send_msg(connections[i], msg1)
                 send_msg(connections[i], msg2)
                 send_msg(connections[i], msg3)
 
-        
+                print("\t--> cmdindex exitcode nfiles", msg1)
+                print(f"\t--> stdout (length: {len(msg2)})")
+                print(f"\t--> stderr (length: {len(msg3)})")
+
+                if output_file is not None:
+                    send_msg(connections[i], os.path.basename(output_file))
+                    with open(output_file, "rb") as f:
+                        send_msg(connections[i], f.read()) 
+                    print("\t-->",os.path.basename(output_file))
                 connections[i].close()
                 returned[i] = True
 
