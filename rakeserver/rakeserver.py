@@ -81,7 +81,6 @@ try:
                 print("\t-->",msg)
                 send_msg(connection, msg)
                 
-            
             elif received_data:
                 index = received_data.split()[0]
                 cmd_indexes.append(index)
@@ -99,7 +98,7 @@ try:
                 try:
                     os.mkdir(execution_path)
                 except FileExistsError:
-                    pass
+                    print("Directory Already Exists")
                 
                 filenames = []
                 for i in range(n_required_files):
@@ -109,6 +108,7 @@ try:
                     file = recv_msg(connection)
                     print(f"\t<-- file (size {len(file)})")
                     filepath = os.path.join(execution_path, filename)
+                    #do we need to check for error here------------------------------------------------ 
                     with open(filepath, "wb") as f:
                         f.write(file)
                 
@@ -121,7 +121,6 @@ try:
 
                 proc = run_command(cmd_str, execution_path)
                 processes.append(proc)
-                
 
         
         for i, proc in enumerate(processes):
@@ -149,7 +148,6 @@ try:
                 msg2 = str(proc.stdout.read().decode("utf-8")) 
                 msg3 = str(proc.stderr.read().decode("utf-8"))
                 
-                
                 send_msg(connections[i], msg1)
                 send_msg(connections[i], msg2)
                 send_msg(connections[i], msg3)
@@ -160,8 +158,11 @@ try:
 
                 if output_file is not None:
                     send_msg(connections[i], os.path.basename(output_file))
-                    with open(output_file, "rb") as f:
-                        send_msg(connections[i], f.read()) 
+                    try:
+                        with open(output_file, "rb") as f:
+                            send_msg(connections[i], f.read()) 
+                    except:
+                        print("Error Opening Output File")
                     print("\t-->",os.path.basename(output_file))
                 connections[i].close()
                 returned[i] = True
