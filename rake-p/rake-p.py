@@ -50,8 +50,9 @@ def read_file(filename):
     try:
         with open(filename, "r") as f:
             rakefile_lines = f.readlines()
-    except:
-        print("Error Opening File")
+    except OSError:
+        print(f"Error: could not find {filename}", file=sys.stderr)
+        exit(1)
    
     in_actionset = False
     current_actionset = None
@@ -218,8 +219,9 @@ def execute_actionsets():
                             if verbose: 
                                 print(f"\t<-- file (size {len(file)})")
                                 print(f"\tSaved file {filename=}")
-                    except:
-                        print("Error Opening File")
+                    except OSError:
+                        print(f"Error: writing {filename} failed", file=sys.stderr)
+                        exit(1)
                 
 
 
