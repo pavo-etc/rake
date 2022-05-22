@@ -104,10 +104,10 @@ try:
                 filenames = []
                 for i in range(n_required_files):
                     filename = recv_msg(connection).decode()
-                    print("\t<--filename:", filename)
+                    print("\t<-- filename:", filename)
                     filenames.append(filename)
                     file = recv_msg(connection)
-                    #print("\t<--file:", file)
+                    print(f"\t<-- file (size {len(file)})")
                     filepath = os.path.join(execution_path, filename)
                     with open(filepath, "wb") as f:
                         f.write(file)

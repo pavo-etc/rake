@@ -3,6 +3,7 @@
 Due date: 5PM Friday 20th May (end of week 11)
 Weight: 
 
+
 Resources:
  + [Project Spec](https://teaching.csse.uwa.edu.au/units/CITS3002/project2022/index.php)
  + [Getting Started Explanation](https://teaching.csse.uwa.edu.au/units/CITS3002/project2022/gettingstarted.php)
@@ -11,7 +12,11 @@ Resources:
 ## Executing
 
 ```sh
-python3 rake-p/rake-p.py [filename]
+python3 ./rakeserver/rakeserver.py
+```
+
+```sh
+python3 ./path/to/rake-p.py [-v] [filename]
 ```
 
 ```sh

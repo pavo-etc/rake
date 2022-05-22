@@ -79,7 +79,6 @@ def check_if_file_exists(filename):
     return os.path.exists(filename)
 
 def send_msg(sock, msg):
-    #if verbose: print(f"Sending to {sock.getpeername()}: {msg}")
     if type(msg) == bytes:
         packed_msg = struct.pack('>I', len(msg)) + msg
     else:
@@ -101,16 +100,21 @@ def find_host():
         addr = host.split(":")[0]
         port = int(host.split(":")[1])
         
-        if verbose: print(f"\t\tQuerying cost from host {i} {host}")
         
+        msg = "cost-query"
         s.connect((addr,port))
-        send_msg(s, 'cost-query')
+        send_msg(s, msg)
+        
+        if verbose: 
+            print(f"\tQuerying cost from host {i} {host}")
+            print(f"\t\t--> {msg}")
+        
         data = recv_msg(s)
         decoded_data = data.decode("utf-8")
         if decoded_data.startswith("cost "):
             cost = int(decoded_data.split()[1])
             
-            if verbose: print(f"\t\t\tReceived: {decoded_data}")
+            if verbose: print(f"\t\t<-- {decoded_data}")
             
             if cost < mincost:
                 mincost_index = i
@@ -136,20 +140,24 @@ def send_command(command_data, i, n_required_files, is_local=False):
     s = socket.socket()
     if verbose: print(f"\tAttempting conection to {addr}:{port}")
     s.connect((addr,port))
-    
-    msg = f'{i} {n_required_files} {command_data[0]}'
-    if verbose: print(f"\tSending: {msg}")
+
+    if command_data[0].startswith("remote-"):
+        msg = f'{i} {n_required_files} {command_data[0][7:]}'
+    else:
+        msg = f'{i} {n_required_files} {command_data[0]}'
+    if verbose: print(f"\t\t-->: {msg}")
     send_msg(s, msg)
 
     for j in range(n_required_files):
-        if verbose: print(f'Sending filename: { command_data[1][j]=}')
+        if verbose: print(f'\t\t--> filename: {command_data[1][j]}')
         
         send_msg(s, command_data[1][j])
         
-        #if verbose: print(f'Sending file: { command_data[1][j]=}')
         
         with open(command_data[1][j], "rb") as f:
-            send_msg(s, f.read())
+            msg = f.read()
+            send_msg(s, msg)
+            if verbose: print(f'\t\t--> file (size {len(msg)})')
         
     return s
 
@@ -180,29 +188,32 @@ def execute_actionsets():
         
             for sock in rsocks:
                 # Receives cmd index and exitcode
+                
                 cmdindex_exitcode_nfile = recv_msg(sock)
                 if cmdindex_exitcode_nfile is None:
                     continue
+                if verbose: print(f"Receiving execution results from {sock.getpeername()}")
                 cmd_index = cmdindex_exitcode_nfile.split()[0]
                 exitcode = cmdindex_exitcode_nfile.split()[1]
                 n_return_files = cmdindex_exitcode_nfile.split()[2]
+                
                 stdout = recv_msg(sock)
-
                 stderr = recv_msg(sock)
+                
+                if verbose: 
+                    print(f"\t<-- cmdindex exitcode nfile {cmdindex_exitcode_nfile.decode()}")
+                    print(f"\t<-- stdout (length {len(stdout)})")
+                    print(f"\t<-- stderr (length {len(stderr)})")
 
                 if int(n_return_files):
-                    filename = recv_msg(sock)
+                    filename = recv_msg(sock).decode()
                     file = recv_msg(sock)
-                    print("\t<--file:", filename)
+                    if verbose: print("\t<-- filename:", filename)
                     with open(filename, "wb") as f:
                         f.write(file)
-                        print("Saved file!")
-
-                if verbose:
-                    print(f"{cmd_index=}")
-                    print(f"\t{exitcode=}")
-                    print(f"\t{stdout=}")
-                    print(f"\t{stderr=}")
+                        if verbose: 
+                            print(f"\t<-- file (size {len(file)})")
+                            print(f"\tSaved file {filename=}")
                 
 
 
@@ -214,6 +225,7 @@ def execute_actionsets():
             if len(rsocks) == len(sockets):
                 break
         if verbose:
+            print(f"\n{actionsetname} execution results:")
             print(f"{stdouts=}")
             print(f"{stderrs=}")
             print(f"{exitcodes=}")
@@ -228,7 +240,6 @@ def execute_actionsets():
 if __name__ == "__main__":
     optlist, args = getopt.getopt(sys.argv[1:], "v")
     for opt in optlist:
-        print(opt)
         if opt[0] == "-v":
             verbose = True
 
