@@ -59,7 +59,7 @@ addresses = []
 cmd_strs = []
 cmd_indexes = []
 
-#to ensure that a process isn't skipped
+# To ensure that a process isn't skipped
 s.settimeout(0.01)
 
 try:
@@ -98,7 +98,7 @@ try:
                 try:
                     os.mkdir(execution_path)
                 except FileExistsError:
-                    print("Directory Already Exists")
+                    print(f"Directory name collision: {execution_path} already exists.  This may produce unintended results", file=sys.stderr)
                 
                 filenames = []
                 for i in range(n_required_files):
@@ -161,8 +161,8 @@ try:
                     try:
                         with open(output_file, "rb") as f:
                             send_msg(connections[i], f.read()) 
-                    except:
-                        print("Error Opening Output File")
+                    except OSError:
+                        print(f"Error: could not open file {output_file}", file=sys.stderr)
                     print("\t-->",os.path.basename(output_file))
                 connections[i].close()
                 returned[i] = True
