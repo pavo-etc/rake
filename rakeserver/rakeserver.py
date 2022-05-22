@@ -34,7 +34,7 @@ s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 print("Created socket")
 
-addr = "localhost"
+addr = "0.0.0.0"
 port = 40000
 
 if len(sys.argv) > 1:
