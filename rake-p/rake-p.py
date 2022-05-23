@@ -90,11 +90,21 @@ def send_msg(sock, msg):
     sock.send(packed_msg)
 
 def recv_msg(sock):
-    packed_msg_len= sock.recv(4)
+    packed_msg_len = sock.recv(4)
     if not packed_msg_len:
         return None
     msg_len = struct.unpack('>I', packed_msg_len)[0]
-    return sock.recv(msg_len)
+    recved_data = force_recv_all(sock, msg_len)
+    return recved_data
+
+def force_recv_all(sock, msg_len):
+    all_data = bytearray()
+    while len(all_data) < msg_len:
+        packet = sock.recv(msg_len - len(all_data))
+        if not packet:
+            return None
+        all_data.extend(packet)
+    return all_data
 
 def find_host():
     mincost = 1000
@@ -196,7 +206,9 @@ def execute_actionsets():
                 cmdindex_exitcode_nfile = recv_msg(sock)
                 if cmdindex_exitcode_nfile is None:
                     continue
-                if verbose: print(f"Receiving execution results from {sock.getpeername()}")
+                if verbose: 
+                    print(sock)
+                    #print(f"Receiving execution results from {sock.getpeername()}")
                 cmd_index = cmdindex_exitcode_nfile.split()[0]
                 exitcode = cmdindex_exitcode_nfile.split()[1]
                 n_return_files = cmdindex_exitcode_nfile.split()[2]

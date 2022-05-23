@@ -7,6 +7,7 @@ import subprocess
 import os
 import uuid
 
+
 def send_msg(sock, msg):
     if type(msg) == bytes:
         packed_msg = struct.pack('>I', len(msg)) + msg
@@ -19,7 +20,17 @@ def recv_msg(sock):
     if not packed_msg_len:
         return None
     msg_len = struct.unpack('>I', packed_msg_len)[0]
-    return sock.recv(msg_len)
+    recved_data = force_recv_all(sock, msg_len)
+    return recved_data
+
+def force_recv_all(sock, msg_len):
+    all_data = bytearray()
+    while len(all_data) < msg_len:
+        packet = sock.recv(msg_len - len(all_data))
+        if not packet:
+            return None
+        all_data.extend(packet)
+    return all_data
 
 def run_command(cmd_str, execution_path):
     if cmd_str.startswith('remote-'):
@@ -37,6 +48,53 @@ optlist, args = getopt.getopt(sys.argv[1:], "v")
 for opt in optlist:
     if opt[0] == "-v":
         verbose = True
+        
+def receive_command(received_data, connection):
+    index = received_data.split()[0]
+    cmd_indexes.append(index)
+    n_required_files = int(received_data.split()[1])
+
+    cmd_str = " ".join(received_data.split()[2:])
+    cmd_strs.append(cmd_str)
+
+    connections.append(connection)
+    addresses.append(addr)
+    returned.append(False)
+    
+    execution_path = f"/tmp/rs-{uuid.uuid4()}"
+    paths.append(execution_path)
+    try:
+        os.mkdir(execution_path)
+    except FileExistsError:
+        print(f"Directory name collision: {execution_path} already exists.  This may produce unintended results.", file=sys.stderr)
+    
+    filenames = []
+    for i in range(n_required_files):
+        filename = recv_msg(connection).decode()
+        print("\t<-- filename:", filename)
+        if filename == "":
+            print("Error: received empty filename")
+            exit(1)
+        filenames.append(filename)
+        file = recv_msg(connection)
+        print(f"\t<-- file (size {len(file)})")
+        filepath = os.path.join(execution_path, filename)
+        #do we need to check for error here------------------------------------------------ 
+        with open(filepath, "wb") as f:
+            f.write(file)
+            print(f"\tSaved file {filepath}")
+    
+    if len(filenames) > 0:
+        last_mod_time = os.path.getmtime(os.path.join(execution_path, filenames[-1]))
+    else:
+        last_mod_time = 0
+    last_mod_times.append(last_mod_time)
+    print(f"\tSaved {len(filenames)} files to dir: {execution_path}")
+
+    proc = run_command(cmd_str, execution_path)
+    processes.append(proc)
+
+
 
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -69,7 +127,7 @@ cmd_strs = []
 cmd_indexes = []
 
 # To ensure that a process isn't skipped
-s.settimeout(0.01)
+s.settimeout(0.1)
 
 try:
     while True:
@@ -91,48 +149,7 @@ try:
                 send_msg(connection, msg)
                 
             elif received_data:
-                index = received_data.split()[0]
-                cmd_indexes.append(index)
-                n_required_files = int(received_data.split()[1])
-
-                cmd_str = " ".join(received_data.split()[2:])
-                cmd_strs.append(cmd_str)
-
-                connections.append(connection)
-                addresses.append(addr)
-                returned.append(False)
-                
-                execution_path = f"/tmp/rs-{uuid.uuid4()}"
-                paths.append(execution_path)
-                try:
-                    os.mkdir(execution_path)
-                except FileExistsError:
-                    print(f"Directory name collision: {execution_path} already exists.  This may produce unintended results", file=sys.stderr)
-                
-                filenames = []
-                for i in range(n_required_files):
-                    filename = recv_msg(connection).decode()
-                    if verbose: print("\t<-- filename:", filename)
-                    filenames.append(filename)
-                    file = recv_msg(connection)
-                    if verbose: print(f"\t<-- file (size {len(file)})")
-                    filepath = os.path.join(execution_path, filename)
-                    try:
-                        with open(filepath, "wb") as f:
-                            f.write(file)
-                    except OSError:
-                        print(f"Error: Writing {filepath} Failed", file=sys.stderr)
-                        exit(1)
-                
-                if len(filenames) > 0:
-                    last_mod_time = os.path.getmtime(os.path.join(execution_path, filenames[-1]))
-                else:
-                    last_mod_time = 0
-                last_mod_times.append(last_mod_time)
-                if verbose: print(f"\tSaved {len(filenames)} files to dir: {execution_path}")
-
-                proc = run_command(cmd_str, execution_path)
-                processes.append(proc)
+                receive_command(received_data, connection)
 
         
         for i, proc in enumerate(processes):
@@ -173,7 +190,8 @@ try:
                     send_msg(connections[i], os.path.basename(output_file))
                     try:
                         with open(output_file, "rb") as f:
-                            send_msg(connections[i], f.read()) 
+                            msg = f.read()
+                            send_msg(connections[i], msg) 
                     except OSError:
                         print(f"Error: could not open file {output_file}", file=sys.stderr)
 
