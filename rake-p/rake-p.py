@@ -29,7 +29,7 @@ Format of action_sets:
 
 def usage():
     print(f'''\
-Usage: {sys.argv[0]} [-v] [Rakefile]
+Usage: {sys.argv[0]} [-v] [file]
     -v: Verbose output
     file: file to execute instead of "./Rakefile"''',
         file=sys.stderr)
@@ -138,12 +138,12 @@ def find_host():
     
     return mincost_index
 
-def send_command(command_data, i, n_required_files, is_local=False):
+def send_command(command_data, i, n_required_files):
     '''
     Function that takes a remote command.  Choses a server to send it to,
     sends required files (if necessary), gets command feedback.
     '''
-    if is_local:
+    if command_data[0].startswith("remote-"):
         addr = "localhost"
         port = int(default_port)
     else:
@@ -190,11 +190,7 @@ def execute_actionsets():
             else:
                 n_required_files = 0
                 
-            if command_data[0].startswith("remote-"):
-                sock = send_command(command_data, i, n_required_files)
-            else:
-                sock = send_command(command_data, i, n_required_files, is_local=True)
-
+            sock = send_command(command_data, i, n_required_files)
             sockets.append(sock)
         
         while True:
@@ -257,21 +253,22 @@ def execute_actionsets():
     if verbose: print("Executed Rakefile successfully!")
 
 if __name__ == "__main__":
-    optlist, args = getopt.getopt(sys.argv[1:], "v")
-    for opt in optlist:
-        if opt[0] == "-v":
+    try:
+        optlist, args = getopt.getopt(sys.argv[1:], "v")
+    except getopt.GetoptError as err:
+        usage()
+    for opt, arg in optlist:
+        if opt == "-v":
             verbose = True
 
-    if len(args) < 1:
-        usage()
     if len(args) > 0:
         filename = args[0]
     else:
         filename = "Rakefile"
         
     read_file(filename)
-    if verbose:
-        print("Hosts: ", hosts)
+    
+    if verbose: print("Hosts: ", hosts)
 
     execute_actionsets()
 
