@@ -40,7 +40,7 @@ def missing_file(command_data, filename):
     exit(1)
 
 def command_fail(actionset, command_data, exitcode, stderr):
-    print(f"Error: command failed\n\tactionset: {actionset}\n\tcommand: {command_data[0]}\n\texitcode: {exitcode}\n\tstderr: {stderr}")
+    print(f"Error: command failed\n\tactionset: {actionset}\n\tcommand: {command_data[0]}\n\texitcode: {exitcode}\n\tstderr: {stderr}", file=sys.stderr)
     exit(1)
 
 def read_file(filename):

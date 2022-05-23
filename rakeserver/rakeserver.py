@@ -1,3 +1,4 @@
+import getopt
 import socket
 import struct
 import sys
@@ -30,21 +31,29 @@ def run_command(cmd_str, execution_path):
     n_active_procs+=1
     return proc
 
+verbose = False
+
+optlist, args = getopt.getopt(sys.argv[1:], "v")
+for opt in optlist:
+    if opt[0] == "-v":
+        verbose = True
+
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-print("Created socket")
+print("Opened server")
+if verbose: print("Created socket")
 
 addr = "0.0.0.0"
 port = 40000
 
-if len(sys.argv) > 1:
-    port = int(sys.argv[1])
+if len(args) > 0:
+    port = int(args[0])
 
 s.bind((addr, port))
-print(f"Socket binded to {port}")
+if verbose: print(f"Socket binded to {port}")
 
 s.listen(5)
-print("Socket is listening")
+if verbose: print("Socket is listening")
 
 nconnections = 0
 n_active_procs = 0
@@ -71,14 +80,14 @@ try:
 
 
         if connection is not None:
-            print(f"Got connection {nconnections} from {addr}")
+            if verbose: print(f"Got connection {nconnections} from {addr}")
             nconnections += 1
            
             received_data = recv_msg(connection).decode()
-            print("\t<--",received_data)
+            if verbose: print("\t<--",received_data)
             if received_data == "cost-query":
                 msg = "cost " + str(n_active_procs)
-                print("\t-->",msg)
+                if verbose: print("\t-->",msg)
                 send_msg(connection, msg)
                 
             elif received_data:
@@ -103,21 +112,24 @@ try:
                 filenames = []
                 for i in range(n_required_files):
                     filename = recv_msg(connection).decode()
-                    print("\t<-- filename:", filename)
+                    if verbose: print("\t<-- filename:", filename)
                     filenames.append(filename)
                     file = recv_msg(connection)
-                    print(f"\t<-- file (size {len(file)})")
+                    if verbose: print(f"\t<-- file (size {len(file)})")
                     filepath = os.path.join(execution_path, filename)
-                    #do we need to check for error here------------------------------------------------ 
-                    with open(filepath, "wb") as f:
-                        f.write(file)
+                    try:
+                        with open(filepath, "wb") as f:
+                            f.write(file)
+                    except OSError:
+                        print(f"Error: Writing {filepath} Failed", file=sys.stderr)
+                        exit(1)
                 
                 if len(filenames) > 0:
                     last_mod_time = os.path.getmtime(os.path.join(execution_path, filenames[-1]))
                 else:
                     last_mod_time = 0
                 last_mod_times.append(last_mod_time)
-                print(f"\tSaved {len(filenames)} files to dir: {execution_path}")
+                if verbose: print(f"\tSaved {len(filenames)} files to dir: {execution_path}")
 
                 proc = run_command(cmd_str, execution_path)
                 processes.append(proc)
@@ -125,7 +137,7 @@ try:
         
         for i, proc in enumerate(processes):
             if proc.poll() is not None and returned[i] == False:
-                print(f"Command {i} complete.  Sending to {connections[i].getpeername()}")
+                if verbose: print(f"Command {i} complete.  Sending to {connections[i].getpeername()}")
                 n_active_procs-=1
                 
                 output_file = None
@@ -152,9 +164,10 @@ try:
                 send_msg(connections[i], msg2)
                 send_msg(connections[i], msg3)
 
-                print("\t--> cmdindex exitcode nfiles", msg1)
-                print(f"\t--> stdout (length: {len(msg2)})")
-                print(f"\t--> stderr (length: {len(msg3)})")
+                if verbose: 
+                    print("\t--> cmdindex exitcode nfiles", msg1)
+                    print(f"\t--> stdout (length: {len(msg2)})")
+                    print(f"\t--> stderr (length: {len(msg3)})")
 
                 if output_file is not None:
                     send_msg(connections[i], os.path.basename(output_file))
@@ -163,7 +176,8 @@ try:
                             send_msg(connections[i], f.read()) 
                     except OSError:
                         print(f"Error: could not open file {output_file}", file=sys.stderr)
-                    print("\t-->",os.path.basename(output_file))
+
+                    if verbose: print("\t-->",os.path.basename(output_file))
                 connections[i].close()
                 returned[i] = True
 
