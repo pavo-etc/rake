@@ -266,8 +266,12 @@ if __name__ == "__main__":
 
     if len(args) < 1:
         usage()
-
-    read_file(args[0])
+    if len(args) > 0:
+        filename = args[0]
+    else:
+        filename = "Rakefile"
+        
+    read_file(filename)
     if verbose:
         print("Hosts: ", hosts)
 
