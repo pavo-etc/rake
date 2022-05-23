@@ -5,13 +5,19 @@
 #include <string.h>
 #include <unistd.h>
 
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netdb.h>
+#include <arpa/inet.h>
+#include <netinet/in.h>
+
 #define MAX_LINE_LEN 100
 #define	CHECK_ALLOC(p) if(p == NULL) { perror(__func__); exit(EXIT_FAILURE); } 
 
 extern  char    **strsplit(const char *line, int *nwords);
 extern  void    free_words(char **words);
 
-
+char *default_port;
 char **hosts; 
 int nhosts;
 bool verbose;
@@ -19,7 +25,7 @@ bool verbose;
 // struct for commands & associated files
 typedef struct {
     char *command;
-    int n_required_files;
+    bool requires_files;
     char *required_files;
 } COMMAND;
 
