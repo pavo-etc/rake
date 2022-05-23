@@ -1,4 +1,6 @@
 #include "rake-c.h"
+#include <getopt.h>
+
 
 bool startswith(const char *prefix, const char *s) {
     return strncmp(prefix, s, strlen(prefix)) == 0;
@@ -8,11 +10,21 @@ void slice(const char *in, char *out, size_t start, size_t end) {
     strncpy(out, in + start, end - start);
 }
 
+void missing_file(char *command_data, char *filename) {
+    fprintf(stderr, "Error: missing file\n\tcommand: %d\n\tfilename: %s", command_data[0], filename);
+    exit(EXIT_FAILURE);
+}
+
+void command_fail(char *actionset, char *command_data, int exitcode, char *stderr_txt) {
+    fprintf(stderr, "Error: command failed\n\tactionset: %s\n\tcommand: %d\n\texitcode: %d\n\tstderr: %s", 
+    actionset, command_data[0], exitcode, stderr_txt);
+    exit(EXIT_FAILURE);
+}
 
 void read_file(char *filename) {
 
+    if (verbose) printf("Reading from %s\n", filename); 
 
-    printf("Reading from %s\n", filename);
     FILE *f = fopen(filename, "r");
     //exit gracefully if file descriptor is equal to null
     if (f == NULL){
@@ -46,7 +58,7 @@ void read_file(char *filename) {
 
         //printf("%d : %s\n", nwords, line);
         //printf("strlen(line): %ld\n",strlen(line));
-        printf("%s\n", line);
+        if (verbose) printf("%s\n", line); 
         char **words = strsplit(line, &nwords);
         //printf("words[0]: %s\n",words[0]);
 
@@ -100,7 +112,7 @@ void read_file(char *filename) {
             char *spaceindex;
             if ( (spaceindex = strchr(line, ' ')) != NULL ) {
                 actionsets[last_actionset_index].commands[ncommands].required_files = strdup(spaceindex + 1);
-                printf("required_files: %s\n", actionsets[last_actionset_index].commands[ncommands].required_files);
+                if (verbose) printf("required_files: %s\n", actionsets[last_actionset_index].commands[ncommands].required_files); 
             } else {
                 fprintf(stderr, "No space in required files line in %s\n", filename);
                 exit(EXIT_FAILURE);
@@ -121,7 +133,7 @@ void read_file(char *filename) {
             actionsets[last_actionset_index].commands[ncommands].n_required_files = 0;
             actionsets[last_actionset_index].commands[ncommands].required_files = calloc(1, sizeof(char **));
             //CHECK_ALLOC(actionsets[last_actionset_index].commands[ncommands].required_files);
-            printf("\tAdded command %d\n", actionsets[last_actionset_index].ncommands);
+            if (verbose) printf("\tAdded command %d\n", actionsets[last_actionset_index].ncommands); 
             actionsets[last_actionset_index].ncommands++;
 
             //printf("NEWCOMMAND: %s\n", actionsets[nactionsets].commands[ncommands].command);
@@ -148,7 +160,7 @@ void read_file(char *filename) {
             actionsets[nactionsets].commands = create_empty_command();
 
             
-            printf("New action set created: %s\n", actionsets[nactionsets].name);
+            if (verbose) printf("New action set created: %s\n", actionsets[nactionsets].name); 
             nactionsets++;
 
         }
@@ -157,30 +169,39 @@ void read_file(char *filename) {
 
     fclose(f);
     
-    printf("default_port: %s\n", default_port);
-    for (int i = 0; i < nhosts; i++) {
-        printf("hosts[%d]: %s\n", i, hosts[i]);
-    }
-
-    for (int i = 0; i < nactionsets; i++) {
-        printf("%s\n",actionsets[i].name);
-        int ncommands = actionsets[i].ncommands;
-        for (int j = 0; j < ncommands; j++) {
-            printf("\t%s\n", actionsets[i].commands[j].command);
-
+    if (verbose) {
+        printf("default_port: %s\n", default_port); 
+        for (int i = 0; i < nhosts; i++) {
+            printf("hosts[%d]: %s\n", i, hosts[i]); 
         }
 
+        for (int i = 0; i < nactionsets; i++) {
+            printf("%s\n",actionsets[i].name); 
+            int ncommands = actionsets[i].ncommands;
+            for (int j = 0; j < ncommands; j++) {
+                printf("\t%s\n", actionsets[i].commands[j].command); 
+
+            }
+        }
     }
-
-
 }
 
 int main(int argc, char *argv[]) {
-    char *filename = "./Rakefile";
-    if (argc > 1) {
-        filename = argv[1];
+    
+    int opt;
+    while ((opt = getopt(argc, argv, "v")) != -1) {
+        switch (opt) {
+            case 'v':
+                verbose = true;
+                break;
+        }
     }
 
+    char *filename = "./Rakefile";
+    if (argc > 1) {
+        filename = argv[optind];
+    }
+    
     //actionsets = create_empty_actionset();
     read_file(filename);
     exit(EXIT_SUCCESS);

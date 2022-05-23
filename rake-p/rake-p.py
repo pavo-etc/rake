@@ -206,9 +206,7 @@ def execute_actionsets():
                 cmdindex_exitcode_nfile = recv_msg(sock)
                 if cmdindex_exitcode_nfile is None:
                     continue
-                if verbose: 
-                    print(sock)
-                    #print(f"Receiving execution results from {sock.getpeername()}")
+                
                 cmd_index = cmdindex_exitcode_nfile.split()[0]
                 exitcode = cmdindex_exitcode_nfile.split()[1]
                 n_return_files = cmdindex_exitcode_nfile.split()[2]

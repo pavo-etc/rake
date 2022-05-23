@@ -6,6 +6,7 @@ import time
 import subprocess
 import os
 import uuid
+import shutil
 
 
 def send_msg(sock, msg):
@@ -42,13 +43,6 @@ def run_command(cmd_str, execution_path):
     n_active_procs+=1
     return proc
 
-verbose = False
-
-optlist, args = getopt.getopt(sys.argv[1:], "v")
-for opt in optlist:
-    if opt[0] == "-v":
-        verbose = True
-        
 def receive_command(received_data, connection):
     index = received_data.split()[0]
     cmd_indexes.append(index)
@@ -94,7 +88,12 @@ def receive_command(received_data, connection):
     proc = run_command(cmd_str, execution_path)
     processes.append(proc)
 
+verbose = False
 
+optlist, args = getopt.getopt(sys.argv[1:], "v")
+for opt in optlist:
+    if opt[0] == "-v":
+        verbose = True
 
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -198,6 +197,9 @@ try:
                     if verbose: print("\t-->",os.path.basename(output_file))
                 connections[i].close()
                 returned[i] = True
+                
+                print(f'\tremoved: {paths[i]}')
+                shutil.rmtree(paths[i])
 
 except KeyboardInterrupt:
     s.close()
