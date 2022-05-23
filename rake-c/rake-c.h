@@ -14,6 +14,7 @@ extern  void    free_words(char **words);
 
 char **hosts; 
 int nhosts;
+bool verbose;
 
 // struct for commands & associated files
 typedef struct {

@@ -40,7 +40,7 @@ def missing_file(command_data, filename):
     exit(1)
 
 def command_fail(actionset, command_data, exitcode, stderr):
-    print(f"Error: command failed\n\tactionset: {actionset}\n\tcommand: {command_data[0]}\n\texitcode: {exitcode}\n\tstderr: {stderr}")
+    print(f"Error: command failed\n\tactionset: {actionset}\n\tcommand: {command_data[0]}\n\texitcode: {exitcode}\n\tstderr: {stderr}", file=sys.stderr)
     exit(1)
 
 def read_file(filename):
@@ -206,9 +206,7 @@ def execute_actionsets():
                 cmdindex_exitcode_nfile = recv_msg(sock)
                 if cmdindex_exitcode_nfile is None:
                     continue
-                if verbose: 
-                    print(sock)
-                    #print(f"Receiving execution results from {sock.getpeername()}")
+                
                 cmd_index = cmdindex_exitcode_nfile.split()[0]
                 exitcode = cmdindex_exitcode_nfile.split()[1]
                 n_return_files = cmdindex_exitcode_nfile.split()[2]
