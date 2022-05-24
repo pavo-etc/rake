@@ -17,7 +17,7 @@ def send_msg(sock, msg):
     sock.send(packed_msg)
 
 def recv_msg(sock):
-    packed_msg_len = sock.recv(4)
+    packed_msg_len = force_recv_all(sock, 4)
     if not packed_msg_len:
         return None
     msg_len = struct.unpack('>I', packed_msg_len)[0]
