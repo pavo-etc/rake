@@ -194,7 +194,9 @@ try:
                     except OSError:
                         print(f"Error: could not open file {output_file}", file=sys.stderr)
 
-                    if verbose: print("\t-->",os.path.basename(output_file))
+                    if verbose: 
+                        print("\t-->",os.path.basename(output_file))
+                        print(f"\t--> file (size {len(msg)})")
                 connections[i].close()
                 returned[i] = True
                 

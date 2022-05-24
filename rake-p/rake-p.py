@@ -144,12 +144,12 @@ def send_command(command_data, i, n_required_files):
     sends required files (if necessary), gets command feedback.
     '''
     if command_data[0].startswith("remote-"):
-        addr = "localhost"
-        port = int(default_port)
-    else:
         host = hosts[find_host()] 
         addr = host.split(":")[0]
         port = int(host.split(":")[1])
+    else:
+        addr = "localhost"
+        port = int(default_port)
 
     s = socket.socket()
     if verbose: print(f"\tAttempting conection to {addr}:{port}")
@@ -159,7 +159,7 @@ def send_command(command_data, i, n_required_files):
         msg = f'{i} {n_required_files} {command_data[0][7:]}'
     else:
         msg = f'{i} {n_required_files} {command_data[0]}'
-    if verbose: print(f"\t\t-->: {msg}")
+    if verbose: print(f"\t\t--> {msg}")
     send_msg(s, msg)
 
     for j in range(n_required_files):
