@@ -37,7 +37,7 @@ def run_command(cmd_str, execution_path):
     if cmd_str.startswith('remote-'):
         cmd_str = cmd_str[7:]
 
-    print("\texecuting", cmd_str)
+    if verbose: print("\tExecuting", cmd_str)
     proc = subprocess.Popen(cmd_str, cwd=execution_path, shell = True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     global n_active_procs
     n_active_procs+=1
@@ -65,25 +65,25 @@ def receive_command(received_data, connection):
     filenames = []
     for i in range(n_required_files):
         filename = recv_msg(connection).decode()
-        print("\t<-- filename:", filename)
+        if verbose: print("\t<-- filename:", filename)
         if filename == "":
             print("Error: received empty filename")
             exit(1)
         filenames.append(filename)
         file = recv_msg(connection)
-        print(f"\t<-- file (size {len(file)})")
+        if verbose: print(f"\t<-- file (size {len(file)})")
         filepath = os.path.join(execution_path, filename)
         #do we need to check for error here------------------------------------------------ 
         with open(filepath, "wb") as f:
             f.write(file)
-            print(f"\tSaved file {filepath}")
+            if verbose: print(f"\tSaved file {filepath}")
     
     if len(filenames) > 0:
         last_mod_time = os.path.getmtime(os.path.join(execution_path, filenames[-1]))
     else:
         last_mod_time = 0
     last_mod_times.append(last_mod_time)
-    print(f"\tSaved {len(filenames)} files to dir: {execution_path}")
+    if verbose: print(f"\tSaved {len(filenames)} files to dir: {execution_path}")
 
     proc = run_command(cmd_str, execution_path)
     processes.append(proc)
@@ -97,7 +97,7 @@ for opt in optlist:
 
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-print("Opened server")
+if verbose: print("Opened server")
 if verbose: print("Created socket")
 
 addr = "0.0.0.0"
@@ -200,7 +200,7 @@ try:
                 connections[i].close()
                 returned[i] = True
                 
-                print(f'\tremoved: {paths[i]}')
+                if verbose: print(f'\tremoved: {paths[i]}')
                 shutil.rmtree(paths[i])
 
 except KeyboardInterrupt:
