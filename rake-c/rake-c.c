@@ -26,10 +26,10 @@ void open_file_fail(COMMAND *cmddata, char *filename) {
     exit(EXIT_FAILURE);
 }
 
-void command_fail(char *actionsetname, char *command_data, int exitcode, char *stderr_txt) {
-    fprintf(stderr, "Error: command failed\n\tactionset: %s\n\tcommand: %d\n\texitcode: %d\n\tstderr: %s", 
+void command_fail(char *actionsetname, char *cmd, int exitcode, char *stderr_txt) {
+    fprintf(stderr, "Error: command failed\n\tactionset: %s\n\tcommand: %s\n\texitcode: %d\n\tstderr: %s", 
         actionsetname, 
-        command_data->command, 
+        cmd, 
         exitcode, 
         stderr_txt
     );
