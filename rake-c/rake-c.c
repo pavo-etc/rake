@@ -44,7 +44,7 @@ void read_file(char *filename) {
     if (verbose) printf("Reading from %s\n", filename); 
 
     FILE *f = fopen(filename, "r");
-    //exit gracefully if file descriptor is equal to null
+    //exit gracefully if file pointer is equal to null
     if (f == NULL){
         fprintf(stderr, "Error opening the file %s\n", filename);
         exit(EXIT_FAILURE);
@@ -53,7 +53,7 @@ void read_file(char *filename) {
     CHECK_ALLOC(actionsets);
 
     int port_len = 0;
-    char *line;
+    char *line = NULL;
     size_t len = 0;
     size_t nread;
     int nwords;
@@ -209,6 +209,7 @@ void read_file(char *filename) {
 void send_msg(int sock, void *msg, uint32_t nbytes) {
     // big endian nbytes
     uint32_t be_nbytes = htonl(nbytes);
+    printf("\tSending %d\n",nbytes);
     send(sock, &be_nbytes, 4, 0);
     send(sock, msg, nbytes, 0);
 }
@@ -231,9 +232,9 @@ int create_socket(char *hostname, char *port) {
     int status;
 
     memset(&hints, 0, sizeof hints);
-    hints.ai_family = AF_UNSPEC; // AF_INET or AF_INET6 to force version
+    hints.ai_family = AF_INET;//AF_UNSPEC; // AF_INET or AF_INET6 to force version
     hints.ai_socktype = SOCK_STREAM;
-
+    
     if ((status = getaddrinfo(hostname, port, &hints, &res)) != 0) {
         fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(status));
         exit(1);
@@ -304,12 +305,10 @@ int send_command(int cmdindex, COMMAND *cmddata) {
     if (cmddata->requires_files) {
         n_required_files = strtokcount(cmddata->required_files, " ");
     }
-
     size_t buf_size =  snprintf(NULL, 0, "%d %d %s", cmdindex, n_required_files, cmddata->command);
 
     char *msg = calloc(1,buf_size+1);
     sprintf(msg, "%d %d %s", cmdindex, n_required_files, cmddata->command);
-    
     send_msg(sock, msg, strlen(msg));
     printf("\t\t--> %s\n", msg);
 
@@ -319,7 +318,7 @@ int send_command(int cmdindex, COMMAND *cmddata) {
         size_t filesize;
         //int fd;
         void *msg;
-        int n;
+        //int n = 0;
                 
         for (int i = 0; i < n_required_files; i++) {
             if (i == 0) {
@@ -329,17 +328,20 @@ int send_command(int cmdindex, COMMAND *cmddata) {
             }
             send_msg(sock, filename, strlen(filename));
             printf("\t\t--> %s\n", filename);
-            stat(filename, &st);
+            if (stat(filename, &st) != 0) {
+                fprintf(stderr, "Error: could not find file %s", filename);
+                exit(EXIT_FAILURE);
+            }
             filesize = st.st_size;
-            printf("\t\tfilesize %ld\n", filesize);
+            printf("\t\tfilesize %zu\n", filesize);
             msg = calloc(1, filesize+1);
             //fd = open(filename, O_RDONLY);
             //n = read(fd, msg, filesize);
             FILE *fp = fopen(filename, "rb");
             int nbytes = fread(msg, 1, filesize, fp);
-            printf("\t\tRead %d bytes", nbytes);
+            printf("\t\tRead %d bytes\n", nbytes);
             send_msg(sock, msg, filesize);
-            printf("\t\t--> file (size %d)\n", n);
+            printf("\t\t--> file (size %zu)\n", filesize);
             //close(fd);
             fclose(fp);
         }
@@ -370,7 +372,7 @@ void execute_actionsets() {
             printf("\tsocketfd %d\n", sockets[j]);
         }
 
-        struct timeval tv = {1, 1000000};
+        //struct timeval tv = {1, 1000000};
 
         fd_set read_fds;
         int max_fd = 0;
@@ -383,7 +385,7 @@ void execute_actionsets() {
                 FD_SET(sockets[j], &read_fds);
                 if (sockets[j] > max_fd) max_fd = sockets[j];
             }
-            if (select(max_fd+1, &read_fds, NULL, NULL, &tv) == -1) {
+            if (select(max_fd+1, &read_fds, NULL, NULL, NULL) == -1) {
                 perror("select() error\n");
                 exit(1);
             }
@@ -437,6 +439,15 @@ void execute_actionsets() {
             printf("Command %d exitcode: %d\n", j, exitcodes[j]);
             printf("Command %d stdout: \n%s\n", j, stdouts[j]);
             printf("Command %d stderr: \n%s\n", j, stderrs[j]);
+            if (exitcodes[j] != 0) {
+                fprintf(stderr, "Error: command failed:\n\tactionset: %s\n\tcommand: %s\n\texitcode: %d\n\tstderr: %s",
+                    actionsetname,
+                    cmdlist[j].command,
+                    exitcodes[j],
+                    stderrs[j]
+                );
+                exit(EXIT_FAILURE);
+            }
         }
  
     }
@@ -454,7 +465,8 @@ int main(int argc, char *argv[]) {
                 usage(argv);
         }
     }
-
+    hosts = NULL;
+    actionsets = NULL;
     char *filename = "./Rakefile";
 
     if (optind < argc) {
