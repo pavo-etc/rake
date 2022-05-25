@@ -1,7 +1,9 @@
 #include "rake-c.h"
 #include <getopt.h>
 
-// Errors
+/*
+"main" file to run the C rake client
+*/
 
 void usage(char *argv[]) {
     fprintf(stderr, "Usage: %s [-v] [file]\n\t-v: Verbose output\n\tfile: file to execute instead of \"./Rakefile\"\n",
@@ -10,6 +12,7 @@ void usage(char *argv[]) {
     exit(EXIT_FAILURE);
 }
 
+// Used for when a missing file is detected
 void missing_file(COMMAND *cmddata, char *filename) {
     fprintf(stderr, "Error: missing file\n\tcommand: %s\n\tfilename: %s", 
         cmddata->command, 
@@ -18,6 +21,7 @@ void missing_file(COMMAND *cmddata, char *filename) {
     exit(EXIT_FAILURE);
 }
 
+// Used for when a file fails to open
 void open_file_fail(COMMAND *cmddata, char *filename) {
     fprintf(stderr, "Error: couldn't open file\n\tcommand: %s\n\tfilename: %s", 
         cmddata->command, 
@@ -26,6 +30,7 @@ void open_file_fail(COMMAND *cmddata, char *filename) {
     exit(EXIT_FAILURE);
 }
 
+// Used for when a command fails
 void command_fail(char *actionsetname, char *cmd, int exitcode, char *stderr_txt) {
     fprintf(stderr, "Error: command failed\n\tactionset: %s\n\tcommand: %s\n\texitcode: %d\n\tstderr: %s", 
         actionsetname, 
@@ -36,7 +41,7 @@ void command_fail(char *actionsetname, char *cmd, int exitcode, char *stderr_txt
     exit(EXIT_FAILURE);
 }
 
-// Sends cost-query to all hosts
+// Chooses the host with the lowest cost after sending a cost-query to each host
 int find_host() {
     int mincost = 1000;
     int best_host_index = 0;
@@ -51,11 +56,14 @@ int find_host() {
 
         int sock = create_socket(host, port);
 
+        // Send a query to the host
         char *msg = "cost-query";
         send_msg(sock, msg, strlen(msg));
         if (verbose) printf("\t\t--> %s\n", (char *)msg);
         
         int msgsize; 
+
+        // Receive the cost
         char *recved_data = (char *) recv_msg(sock, &msgsize);
         if (verbose) printf("\t\t<-- %s\n", recved_data);
 
@@ -75,9 +83,12 @@ int find_host() {
         close(sock);
     }
     if (verbose) printf("\t\tSelecting %s\n", hosts[best_host_index]);
+
+    // Returns the index of the host with lowest cost in the list of hosts
     return best_host_index;
 }
 
+// Sends command to host with lowest cost to be processed
 int send_command(int cmdindex, COMMAND *cmddata) {
     char *hostname;
     char *port;
@@ -136,13 +147,11 @@ int send_command(int cmdindex, COMMAND *cmddata) {
             send_msg(sock, msg, filesize);
             if (verbose) printf("\t\t--> file (size %zu)\n", filesize);
         }
-
     }
-
     return sock;
-
 }
 
+// Function to execute all the actionsets in the actionsets in the Rakefile
 void execute_actionsets() {
     char *actionsetname;
     COMMAND *cmdlist;
@@ -179,7 +188,8 @@ void execute_actionsets() {
                 perror("select() error\n");
                 exit(1);
             }
-             
+            
+            // loop for obtaining the data received back from the server
             for (int j = 0; j < ncmds; j++) {
                 if (FD_ISSET(sockets[j], &read_fds)) {
                     
@@ -224,7 +234,6 @@ void execute_actionsets() {
             if (cmds_returned >= ncmds) {
                 break;
             }
-
         }
         for (int j = 0; j < ncmds; j++) {
             if (verbose) {
@@ -242,13 +251,13 @@ void execute_actionsets() {
                 exit(EXIT_FAILURE);
             }
         }
- 
     }
 }
 
 int main(int argc, char *argv[]) {
     
     int opt;
+    // Check for verbose flag "-v"
     while ((opt = getopt(argc, argv, "v")) != -1) {
         switch (opt) {
             case 'v':
@@ -265,7 +274,7 @@ int main(int argc, char *argv[]) {
     if (optind < argc) {
         filename = argv[optind];
     }
-
+    
     read_file(filename);
     if (verbose) print_actionsets();
     execute_actionsets();

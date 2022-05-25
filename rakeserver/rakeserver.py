@@ -110,7 +110,7 @@ if verbose: print("Created socket")
 
 # Default values
 addr = "0.0.0.0"
-port = 40000
+port = 12345
 
 if len(args) > 0:
     port = int(args[0])

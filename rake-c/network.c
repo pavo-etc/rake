@@ -1,5 +1,10 @@
 #include "rake-c.h"
 
+/*
+File to hold all the functions specific to network interaction,
+messaging and sockets.
+*/
+
 // Sends big endian uint32 header then message payload 
 void send_msg(int sock, void *msg, uint32_t nbytes) {
     // big endian nbytes
@@ -22,12 +27,13 @@ void *recv_msg(int sock, int *size) {
     return msg;
 }
 
+// Creates a socket 
 int create_socket(char *hostname, char *port) {
     struct addrinfo hints, *res;
     int status;
 
     memset(&hints, 0, sizeof hints);
-    hints.ai_family = AF_INET;//AF_UNSPEC; // AF_INET or AF_INET6 to force version
+    hints.ai_family = AF_INET; //AF_UNSPEC doesn't work on clang/macOS but works on Linux
     hints.ai_socktype = SOCK_STREAM;
     
     if ((status = getaddrinfo(hostname, port, &hints, &res)) != 0) {
