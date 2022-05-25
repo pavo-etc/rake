@@ -146,6 +146,7 @@ try:
                 msg = "cost " + str(n_active_procs)
                 if verbose: print("\t-->",msg)
                 send_msg(connection, msg)
+                connection.close()
                 
             elif received_data:
                 receive_command(received_data, connection)
@@ -175,6 +176,8 @@ try:
 
                 msg2 = str(proc.stdout.read().decode("utf-8")) 
                 msg3 = str(proc.stderr.read().decode("utf-8"))
+                proc.stdout.close()
+                proc.stderr.close()
                 
                 send_msg(connections[i], msg1)
                 send_msg(connections[i], msg2)
