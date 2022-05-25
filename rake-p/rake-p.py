@@ -241,9 +241,8 @@ def execute_actionsets():
             
         if verbose:
             print(f"\n{actionsetname} execution results:")
-            print(f"{stdouts=}")
-            print(f"{stderrs=}")
-            print(f"{exitcodes=}")
+            for i in range(len(stdouts)):
+                print(f'--------------------\ncommand: {i}\nOutput:\n{stdouts[i]}Error:\n{stderrs[i]}Exit Code:{exitcodes[i]}\n--------------------')
             print("\n\n")
 
         for i,exitcode in enumerate(exitcodes):
