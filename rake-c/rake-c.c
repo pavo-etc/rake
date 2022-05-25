@@ -269,7 +269,7 @@ int main(int argc, char *argv[]) {
     read_file(filename);
     if (verbose) print_actionsets();
     execute_actionsets();
-    if (verbose) printf("Rakefile executed successfully!");
+    if (verbose) printf("Rakefile executed successfully!\n");
     exit(EXIT_SUCCESS);
 }
 
