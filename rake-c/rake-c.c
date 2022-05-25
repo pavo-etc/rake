@@ -72,7 +72,7 @@ int find_host() {
             fprintf(stderr, "Couldn't retrieve cost from %s:%s\n", host, port); 
             exit(EXIT_FAILURE);
         }
-
+        close(sock);
     }
     if (verbose) printf("\t\tSelecting %s\n", hosts[best_host_index]);
     return best_host_index;
@@ -269,6 +269,7 @@ int main(int argc, char *argv[]) {
     read_file(filename);
     if (verbose) print_actionsets();
     execute_actionsets();
+    if (verbose) printf("Rakefile executed successfully!");
     exit(EXIT_SUCCESS);
 }
 

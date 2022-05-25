@@ -1,4 +1,3 @@
-from email.policy import default
 import struct
 import sys
 import os
@@ -133,7 +132,7 @@ def find_host():
             if cost < mincost:
                 mincost_index = i
                 mincost = cost
-    
+        s.close()
     if verbose: print(f"\t\tSelecting host {mincost_index}")
     
     return mincost_index
@@ -194,7 +193,8 @@ def execute_actionsets():
             sockets.append(sock)
         
         while True:
-            rsocks, wsocks, esocks = select.select(sockets,[],[])
+            active_socks = [sock for sock in sockets if sock.fileno() >= 0]
+            rsocks, wsocks, esocks = select.select(active_socks,[],[])
         
             for sock in rsocks:
                 # Receives cmd index and exitcode
@@ -228,7 +228,7 @@ def execute_actionsets():
                     except OSError:
                         print(f"Error: writing {filename} failed", file=sys.stderr)
                         exit(1)
-                
+                sock.close()
 
 
                 command_index = int(cmd_index)
@@ -236,7 +236,7 @@ def execute_actionsets():
                 stdouts[command_index] = stdout.decode()
                 stderrs[command_index] = stderr.decode()
 
-            if len(rsocks) == len(sockets):
+            if len(rsocks) == len(active_socks):
                 break
             
         if verbose:
