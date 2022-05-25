@@ -8,7 +8,7 @@ import os
 import uuid
 import shutil
 
-
+# Sends packed big endian message 
 def send_msg(sock, msg):
     if type(msg) == bytes:
         packed_msg = struct.pack('>I', len(msg)) + msg
@@ -16,6 +16,7 @@ def send_msg(sock, msg):
         packed_msg = struct.pack('>I', len(msg)) + msg.encode()
     sock.send(packed_msg)
 
+# Receives a packed bid endian message from a socket
 def recv_msg(sock):
     packed_msg_len = force_recv_all(sock, 4)
     if not packed_msg_len:
@@ -24,6 +25,7 @@ def recv_msg(sock):
     recved_data = force_recv_all(sock, msg_len)
     return recved_data
 
+# Ensures that all the bytes we want to read on receival are read
 def force_recv_all(sock, msg_len):
     all_data = bytearray()
     while len(all_data) < msg_len:
@@ -33,6 +35,7 @@ def force_recv_all(sock, msg_len):
         all_data.extend(packet)
     return all_data
 
+# Executes a given command
 def run_command(cmd_str, execution_path):
     if cmd_str.startswith('remote-'):
         cmd_str = cmd_str[7:]
@@ -43,6 +46,7 @@ def run_command(cmd_str, execution_path):
     n_active_procs+=1
     return proc
 
+# Processes all the data from the given command
 def receive_command(received_data, connection):
     index = received_data.split()[0]
     cmd_indexes.append(index)
@@ -55,6 +59,7 @@ def receive_command(received_data, connection):
     addresses.append(addr)
     returned.append(False)
     
+    # Create a temporary directory to work in for the command
     execution_path = f"/tmp/rs-{uuid.uuid4()}"
     paths.append(execution_path)
     try:
@@ -62,6 +67,7 @@ def receive_command(received_data, connection):
     except FileExistsError:
         print(f"Directory name collision: {execution_path} already exists.  This may produce unintended results.", file=sys.stderr)
     
+    # Loop through required files and write them into a new file in temp directory, where they can be used
     filenames = []
     for i in range(n_required_files):
         filename = recv_msg(connection).decode()
@@ -73,7 +79,7 @@ def receive_command(received_data, connection):
         file = recv_msg(connection)
         if verbose: print(f"\t<-- file (size {len(file)})")
         filepath = os.path.join(execution_path, filename)
-        #do we need to check for error here------------------------------------------------ 
+        
         with open(filepath, "wb") as f:
             f.write(file)
             if verbose: print(f"\tSaved file {filepath}")
@@ -90,25 +96,30 @@ def receive_command(received_data, connection):
 
 verbose = False
 
+# Checks to see if the "-v" flag was used
 optlist, args = getopt.getopt(sys.argv[1:], "v")
 for opt in optlist:
     if opt[0] == "-v":
         verbose = True
 
+# Open the server and create a socket
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 if verbose: print("Opened server")
 if verbose: print("Created socket")
 
+# Default values
 addr = "0.0.0.0"
 port = 40000
 
 if len(args) > 0:
     port = int(args[0])
 
+# Bind the socket to a port
 s.bind((addr, port))
 if verbose: print(f"Socket binded to {port}")
 
+# Have the socket listen for a connection
 s.listen(5)
 if verbose: print("Socket is listening")
 
@@ -131,11 +142,12 @@ s.settimeout(0.1)
 try:
     while True:
         try:
+            # Accepts a connection
             connection, addr = s.accept()
         except socket.timeout:
             connection = None
 
-
+        # If a connection has been made
         if connection is not None:
             if verbose: print(f"Got connection {nconnections} from {addr}")
             nconnections += 1
@@ -151,7 +163,7 @@ try:
             elif received_data:
                 receive_command(received_data, connection)
 
-        
+        # Loop through all process currently on the server that haven't been processed
         for i, proc in enumerate(processes):
             if proc.poll() is not None and returned[i] == False:
                 if verbose: print(f"Command {i} complete.  Sending to {connections[i].getpeername()}")
@@ -176,9 +188,12 @@ try:
 
                 msg2 = str(proc.stdout.read().decode("utf-8")) 
                 msg3 = str(proc.stderr.read().decode("utf-8"))
+
+                # Close the process files 
                 proc.stdout.close()
                 proc.stderr.close()
                 
+                # Send back data to the client
                 send_msg(connections[i], msg1)
                 send_msg(connections[i], msg2)
                 send_msg(connections[i], msg3)
@@ -188,6 +203,7 @@ try:
                     print(f"\t--> stdout (length: {len(msg2)})")
                     print(f"\t--> stderr (length: {len(msg3)})")
 
+                # Sends back to the client the output file if there was one
                 if output_file is not None:
                     send_msg(connections[i], os.path.basename(output_file))
                     try:
@@ -200,12 +216,15 @@ try:
                     if verbose: 
                         print("\t-->",os.path.basename(output_file))
                         print(f"\t--> file (size {len(msg)})")
+
+                # Close the connection
                 connections[i].close()
                 returned[i] = True
                 
                 if verbose: print(f'\tremoved: {paths[i]}')
-                shutil.rmtree(paths[i])
+                shutil.rmtree(paths[i])             # Remove the temporary directory
 
+# To close the server ("^C")
 except KeyboardInterrupt:
     s.close()
     print("\tClosed server")
