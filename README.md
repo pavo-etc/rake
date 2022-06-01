@@ -1,6 +1,6 @@
 # rake
 
-Client and server applications for rake, a protocol for remote execution and distributed compilation.
+Client and server applications for rake, a protocol for distributed compilation and remote command execution.
 
 *r(emote) + (m)ake = rake*
 
