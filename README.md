@@ -27,6 +27,8 @@ python3 ./path/to/rake-p.py [-v] [filename]
 
 Supported on Unix-like systems. Tested on Ubuntu 20.04 and macOS Mojave.
 
+Final mark: 95%
+
 Due date: 5PM Friday 20th May (end of week 11)
 
 Resources:
